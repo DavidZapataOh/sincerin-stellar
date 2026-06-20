@@ -1,0 +1,15 @@
+# Rust / Cargo
+/target
+**/target/
+
+# RISC Zero receipt + proving artifacts
+/out
+
+# Node / frontend (s3)
+node_modules/
+/frontend/.next/
+/frontend/dist/
+
+# OS / editor
+.DS_Store
+*.swp
