@@ -1,0 +1,18 @@
+[package]
+name    = "zk-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# no_std so this crate can be used by both the RISC Zero guest and the Soroban contract.
+description = "Shared no_std primitives: Poseidon2-BN254, Merkle, note commitment/nullifier, journal codec."
+
+[lib]
+crate-type = ["lib"]
+
+[features]
+default = []
+# Enable std for host-side use (tests, build scripts, host binary).
+std = []
+
+[dependencies]
+# No runtime deps at scaffold stage; Poseidon2 + arkworks added in s1/02.

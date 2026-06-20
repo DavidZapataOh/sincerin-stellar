@@ -1,0 +1,7 @@
+# rust-toolchain.toml
+# AC5.2: stable channel; wasm32v1-none for Soroban contracts.
+# RISC Zero proving uses the "risc0" toolchain installed via rzup (separate).
+[toolchain]
+channel    = "stable"
+components = ["rustfmt", "clippy"]
+targets    = ["wasm32v1-none", "wasm32-unknown-unknown"]

@@ -1,0 +1,20 @@
+[package]
+name    = "methods"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "RISC Zero methods crate: exposes guest ELF + image ID to the host."
+
+[lib]
+crate-type = ["lib"]
+
+[build-dependencies]
+risc0-build = { workspace = true }
+
+[dependencies]
+# risc0-zkvm on the host side (full features) for ImageId type.
+risc0-zkvm = { workspace = true }
+
+# Tell risc0-build where the guest is.
+[package.metadata.risc0]
+methods = ["guest"]

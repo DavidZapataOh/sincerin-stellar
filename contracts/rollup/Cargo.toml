@@ -1,0 +1,23 @@
+[package]
+name    = "rollup"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Soroban rollup contract: verify receipt → assert roots → mark nullifiers → transfer."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# testutils enables soroban-sdk test harness for unit tests.
+default  = []
+testutils = ["soroban-sdk/testutils"]
+
+[dependencies]
+soroban-sdk = { workspace = true }
+# Shared no_std primitives (journal codec etc.).
+zk-core     = { workspace = true }
+
+[dev-dependencies]
+soroban-sdk = { workspace = true, features = ["testutils"] }
+# Note: release profile is set in the workspace root Cargo.toml.

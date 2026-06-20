@@ -1,0 +1,52 @@
+[workspace]
+# s1/01 — Confidential Payments Rollup on Stellar
+# Plan: plans/s1/01-scaffold-and-pin.md
+# Criterion: CONTEXT.md D5 / AC5.2
+members = [
+    "crates/zk-core",
+    "methods",
+    "host",
+    "contracts/rollup",
+]
+resolver = "2"
+
+[workspace.package]
+version    = "0.1.0"
+edition    = "2021"
+license    = "Apache-2.0"
+publish    = false
+
+# ── RISC Zero — EXACT PIN (hard requirement, see CONTEXT.md AC5.2) ──────────
+# NOTE: risc0-zkvm 3.0.0 is YANKED on crates.io (discovered 2026-06-20).
+#       3.0.5 is the earliest resolvable 3.x patch that is compatible with
+#       risc0-ethereum-contracts 3.0.1 (which requires ^3.0.3).
+#       The parameters.json in stellar-risc0-verifier says "version": "3.0.0"
+#       but that refers to the protocol version of the verifier keys, not the
+#       crate version; the Groth16 keys are identical across all 3.0.x patches.
+#       cargo-risczero 3.0.5 is already installed in this environment.
+#       Pin is "=3.0.5" — the closest valid equivalent to the plan's "=3.0.0".
+[workspace.dependencies]
+risc0-zkvm               = { version = "=3.0.5" }
+risc0-build              = { version = "=3.0.5" }
+risc0-ethereum-contracts = { version = "=3.0.1" }
+
+# ── Soroban ──────────────────────────────────────────────────────────────────
+soroban-sdk = { version = "25.1.0", default-features = false }
+
+# ── Workspace crates ─────────────────────────────────────────────────────────
+zk-core = { path = "crates/zk-core", default-features = false }
+
+[profile.release]
+opt-level       = "z"
+overflow-checks = true
+debug           = 0
+strip           = "symbols"
+debug-assertions = false
+panic           = "abort"
+codegen-units   = 1
+lto             = true
+
+# Release with logs for local debugging
+[profile.release-with-logs]
+inherits         = "release"
+debug-assertions = true

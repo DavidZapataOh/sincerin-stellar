@@ -1,0 +1,22 @@
+[package]
+name    = "host"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Host binary: runs the RISC Zero guest + wraps the receipt to Groth16."
+
+[[bin]]
+name = "host"
+path = "src/main.rs"
+
+[dependencies]
+methods                  = { path = "../methods" }
+# AC5.2: EXACT pin.  Full features needed for proving on host.
+risc0-zkvm               = { workspace = true }
+# encode_seal() for Groth16 seal encoding (needed by the Soroban verifier).
+risc0-ethereum-contracts = { workspace = true }
+# Shared primitives (no_std crate, std feature enabled for host).
+zk-core                  = { workspace = true, features = ["std"] }
+
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
