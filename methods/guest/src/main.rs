@@ -36,6 +36,30 @@ use zk_core::note::{self, Note};
 use zk_core::poseidon2::Fr;
 use zk_core::witness::GuestInput;
 
+/// Pool-wide Merkle tree depth (number of levels = number of siblings on every
+/// authentication path). The pool is a fixed-depth binary tree of `2^TREE_DEPTH`
+/// leaves; every membership path therefore has EXACTLY `TREE_DEPTH` siblings and
+/// every valid leaf index is in `[0, 2^TREE_DEPTH)`.
+///
+/// **Value:** `3` — chosen to match the membership this guest already verifies.
+/// The golden `golden/n2_inputs.json` tree (the only inputs this guest is gated
+/// on, derived byte-for-byte from the PoC `golden/poc_vectors.json`) has paths of
+/// length 3 and leaves at indices 0 and 1, i.e. a depth-3 tree. Pinning the
+/// constant here makes that depth an explicit, enforced pool parameter.
+///
+/// **Why it is consensus-critical (SEC Critical):** `merkle::root_from_path`
+/// orients each level using only the LOW `path.len()` bits of `index`, but the
+/// nullifier derives from `Fr::from(index)` over the FULL u64 (`note.rs`
+/// `path_indices`). Without pinning, a note genuinely at leaf `p` passes
+/// membership for EVERY `index ∈ {p, p+2^d, p+2·2^d, …}` (identical low bits ⇒
+/// identical orientation) while minting a DIFFERENT nullifier each time ⇒ the
+/// same committed note yields unlimited distinct valid nullifiers ⇒ unbounded
+/// double-spend the contract cannot catch. Asserting `index < 2^TREE_DEPTH` AND
+/// `path.len() == TREE_DEPTH` forces the membership orientation and the
+/// nullifier's `path_indices` to share the SAME bits — they can no longer
+/// diverge — and rejects depth-confusion witnesses loudly.
+const TREE_DEPTH: usize = 3;
+
 fn main() {
     // ── Read the private witness + public root (LE bytes → field elements) ────
     let input: GuestInput = env::read();
@@ -53,6 +77,33 @@ fn main() {
     let mut total: u128 = 0;
 
     for w in &input.notes {
+        // ── WITNESS-TRUST BOUNDARY (SEC Critical + Important) ─────────────────
+        // Pin the witness to the pool's tree shape BEFORE deriving anything, so
+        // the membership orientation (low bits of `index`) and the nullifier's
+        // `path_indices` (Fr::from(FULL index)) cannot diverge. Strict asserts —
+        // a malformed witness is rejected loudly, never silently masked.
+        //
+        // (Important) Path must be exactly pool-depth: a shorter/longer path
+        // would verify membership at the wrong depth (e.g. a length-0 path makes
+        // root_from_path return the commitment unchanged).
+        assert!(
+            w.path.len() == TREE_DEPTH,
+            "guest: merkle path length {} != tree depth {} (depth not pinned)",
+            w.path.len(),
+            TREE_DEPTH
+        );
+        // (Critical) Index must be in the tree's leaf range. Without this, an
+        // index congruent to the true leaf modulo 2^TREE_DEPTH passes membership
+        // (identical low bits) but mints a DIFFERENT nullifier via Fr::from(index)
+        // ⇒ unbounded double-spend. 1u64 << TREE_DEPTH is the leaf count.
+        assert!(
+            w.index < (1u64 << TREE_DEPTH),
+            "guest: index {} out of range for tree depth {} (>= 2^{})",
+            w.index,
+            TREE_DEPTH,
+            TREE_DEPTH
+        );
+
         // Reconstruct the note. `amount` is bound into the commitment as
         // Fr::from(amount); blinding & secret come from the witness (LE).
         let note = Note {
