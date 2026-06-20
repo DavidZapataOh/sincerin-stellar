@@ -7,37 +7,28 @@
 //!
 //! **AC1.2 / AC1.3 (BLOQUEANTE):** The Poseidon2 parameters and Merkle tree
 //! logic MUST produce byte-identical outputs to the PoC
-//! (`stellar-private-payments`). The cross-check test (s1/02) guards this.
-//! Do NOT add hashing primitives here until the cross-check passes.
+//! (`stellar-private-payments`). The cross-check test (`tests/crosscheck_poc.rs`,
+//! s1/02) guards this: a single differing byte fails the build.
 //!
-//! Sprint s1/01 scope: skeleton only.  Types and implementations are stubs
-//! that will be filled in by s1/02 (cross-check) and s1/03 (guest logic).
+//! ## Crypto reproduced (all confirmed against PoC source — see `docs/params.md`)
+//! - Poseidon2-BN254 (HorizenLabs `zkhash`), instances t = 2, 3, 4, all
+//!   d = 5, RF = 8, RP = 56. Field = `ark_bn254::Fr` (identical modulus to the
+//!   PoC's `FpBN256`).
+//! - `pubkey     = Poseidon2_t3([sk, 0, 3])[0]`
+//! - `commitment = Poseidon2_t4([amount, pubkey, blinding, 1])[0]`
+//! - `signature  = Poseidon2_t4([priv_key, commitment, path_indices, 4])[0]`
+//! - `nullifier  = Poseidon2_t4([commitment, path_indices, signature, 2])[0]`
+//! - Merkle node = `Poseidon2_t2_perm([left, right])[0] + left` (feed-forward).
+//! - Serialization = 32-byte LITTLE-ENDIAN (`Fr::into_bigint().to_bytes_le()`).
 #![no_std]
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 
-// ── Module stubs (filled in by subsequent tasks) ──────────────────────────
+pub mod merkle;
+pub mod note;
+pub mod poseidon2;
 
-/// Poseidon2 over the BN254 scalar field.
-///
-/// Parameters must match `circuits/poseidon2/*` in `stellar-private-payments`
-/// exactly.  Confirmed by the cross-check test in s1/02.
-pub mod poseidon2 {
-    // TODO (s1/02): port Poseidon2-BN254 from PoC; cross-check FIRST.
-}
-
-/// Incremental Merkle tree (BN254 field, Poseidon2 hashing).
-pub mod merkle {
-    // TODO (s1/02): port MerkleTree from PoC after cross-check passes.
-}
-
-/// Note commitment and nullifier derivation.
-///
-/// **AC1.2:** commitment(note) and nullifier(note, key) must be byte-identical
-/// to the PoC for the same input.
-pub mod note {
-    // TODO (s1/02): derive after Poseidon2 is confirmed byte-identical.
-}
+mod poseidon2_constants;
 
 /// Journal codec: `{ merkle_root, [nullifier_i], [(recipient_i, amount_i)] }`.
 ///
