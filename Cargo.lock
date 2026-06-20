@@ -2647,6 +2647,7 @@ dependencies = [
 name = "host"
 version = "0.1.0"
 dependencies = [
+ "hex",
  "methods",
  "risc0-ethereum-contracts",
  "risc0-zkvm",

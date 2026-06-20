@@ -11,8 +11,12 @@ crate-type = ["lib"]
 
 [features]
 default = []
-# Enable std for host-side use (tests, build scripts, host binary).
-std = ["ark-bn254/std", "ark-ff/std"]
+# Enable std for host-side use (tests, build scripts, host binary). Implies the
+# guest I/O wire types (host builds the ExecutorEnv).
+std = ["ark-bn254/std", "ark-ff/std", "witness"]
+# Guest I/O wire types (GuestInput / NoteWitness). no_std + alloc; pulls serde.
+# The guest enables this; the Soroban contract does NOT (keeps serde out of wasm).
+witness = ["dep:serde"]
 
 [dependencies]
 # Arkworks BN254 scalar field — the SAME crate versions the PoC
@@ -21,6 +25,10 @@ std = ["ark-bn254/std", "ark-ff/std"]
 # the RISC Zero guest and the Soroban contract.
 ark-bn254 = { version = "0.6.0", default-features = false, features = ["curve"] }
 ark-ff    = { version = "0.6.0", default-features = false }
+
+# serde for the guest I/O wire types only (feature = "witness"). no_std + alloc +
+# derive. Same serde the RISC Zero guest already pulls, so no new lock churn.
+serde = { version = "1", default-features = false, features = ["alloc", "derive"], optional = true }
 
 [dev-dependencies]
 # Cross-check test (std) loads the frozen golden JSON produced by the PoC.

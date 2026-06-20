@@ -212,3 +212,52 @@ exercised (not vacuous), and (b) pins that `r → 0` and `r+7 → 7` under
 All three reproduce **byte-identical** in zk-core (pubkey + commitment + signature
 + nullifier). Verdict: byte-identity holds on the reduction path. (Negative control:
 flipping one expected byte makes the gate fail loudly with `DIVERGENCE`.)
+
+---
+
+## 8. Canonical journal layout (s1/03 — `zk_core::journal`)
+
+Realizes **CONTEXT.md D3 / AC3.1**: the receipt journal contains **exactly**
+`{ merkle_root, [nullifier_i]_{i=1..N}, [(recipient_i, amount_i)]_{i=1..N} }`.
+
+**`zk_core::journal` OWNS this layout.** The guest commits these raw bytes
+verbatim (`env::commit_slice`), so the on-chain `receipt.journal` *is* this
+buffer. s2/01 (`journal-interop`) only **decodes** it (via `journal::decode`,
+available without the `witness`/serde feature) — it never redefines the layout.
+
+```text
+  offset      size      field
+  0           32        root        (Fr, 32B LITTLE-ENDIAN — note::fr_to_le_bytes)
+  32          4         N           (u32 LITTLE-ENDIAN) — count of nullifiers = count of payouts
+  36          N*32      nullifiers  (N × Fr, 32B LE each)
+  36 + N*32   N*48      payouts     (N × [ recipient(32B raw) ‖ amount(u128, 16B LE) ])
+```
+Total length = `36 + N*80` bytes. The single `N` prefix governs both arrays
+(always equal length: one nullifier + one payout per withdrawal), making the
+layout self-describing and exactly decodable. `decode` is strict — the buffer
+length must equal `36 + N*80` for the declared `N`, else `JournalError`
+(`TooShortForHeader` / `LengthMismatch`). Field elements use the project-wide
+**LE** convention (§5); `amount` uses native `u128::to_le_bytes`; `recipient` is
+an opaque 32-byte address copied verbatim. Codec + round-trip unit tests:
+`crates/zk-core/src/journal.rs` (`cargo test -p zk-core --features std journal::`).
+
+### GuestInput wire format (`zk_core::witness`, feature `witness`)
+
+Private input the host hands the guest via `env::write` / the guest reads via
+`env::read`. Field-gated behind `witness` (pulls `serde`) so the Soroban
+contract build never compiles it. `ark_bn254::Fr` is **not** `serde::Serialize`
+in our config, so every field element crosses the wire as **32-byte LE**:
+
+```text
+  GuestInput  { notes: Vec<NoteWitness>, merkle_root: [u8;32] (LE) }
+  NoteWitness { secret:   [u8;32] (LE),   blinding: [u8;32] (LE),
+                amount:   u128,           recipient: [u8;32] (raw),
+                path:     Vec<[u8;32]> (LE, leaf level first),
+                index:    u64 }
+```
+`blinding` is REQUIRED (the commitment is `Poseidon2(amount, pubkey, blinding)`;
+the guest cannot recompute the commitment — hence membership — without it). The
+demo's frozen valid N=2 input is `golden/n2_inputs.json` (real PoC vectors
+note0 @ leaf 0 + note1 @ leaf 1, same depth-3 tree, root
+`0x9e24c3e7…3ef52119`). Executor gate (no proving): `cargo test -p host --test
+guest_exec`.

@@ -24,15 +24,14 @@
 #![deny(unsafe_code)]
 #![deny(missing_docs)]
 
+pub mod journal;
 pub mod merkle;
 pub mod note;
 pub mod poseidon2;
 
-mod poseidon2_constants;
+/// Guest I/O wire types (`GuestInput`, `NoteWitness`). Feature-gated behind
+/// `witness` (pulls `serde`) so the Soroban contract build never compiles them.
+#[cfg(feature = "witness")]
+pub mod witness;
 
-/// Journal codec: `{ merkle_root, [nullifier_i], [(recipient_i, amount_i)] }`.
-///
-/// **AC3.1:** the journal contains exactly these fields.
-pub mod journal {
-    // TODO (s1/03): implement after note/nullifier types are stable.
-}
+mod poseidon2_constants;
