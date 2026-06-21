@@ -40,6 +40,9 @@ pub mod journal;
 
 /// The 32-byte RISC Zero image id of OUR rollup guest binary
 /// (`methods::ROLLUP_GUEST_ID`, frozen at `out/receipt/image_id.hex`).
+/// **Reproducible** value from the pinned Docker guest build (see `methods/build.rs`):
+/// `cbeab7aa6ce69944e10cca8c7ed94d15aae297f2580752f07a15c6cab6ba0d46` — deterministic
+/// across machines/paths (a local build embeds source paths and changes this).
 ///
 /// **This is the trust anchor of the whole contract.** `settle_batch` asserts the
 /// caller-supplied `image_id` equals this constant before doing anything else, so
@@ -48,8 +51,8 @@ pub mod journal;
 /// and a const is the most auditable form — there is no setter, no storage slot,
 /// nothing an admin key could repoint.
 pub const ROLLUP_GUEST_ID: [u8; 32] = [
-    0x3f, 0x03, 0x6c, 0x52, 0x8c, 0x18, 0xed, 0x4c, 0xd6, 0x6a, 0x89, 0x88, 0x39, 0xd3, 0x43, 0xfd,
-    0x4a, 0x51, 0xbb, 0x87, 0x35, 0xac, 0xec, 0x05, 0x77, 0xc6, 0xc6, 0x38, 0x9c, 0x5d, 0x4d, 0x22,
+    0xcb, 0xea, 0xb7, 0xaa, 0x6c, 0xe6, 0x99, 0x44, 0xe1, 0x0c, 0xca, 0x8c, 0x7e, 0xd9, 0x4d, 0x15,
+    0xaa, 0xe2, 0x97, 0xf2, 0x58, 0x07, 0x52, 0xf0, 0x7a, 0x15, 0xc6, 0xca, 0xb6, 0xba, 0x0d, 0x46,
 ];
 
 /// Minimal client for the deployed RISC Zero verifier (`CBQF…`, version 3.0.0).

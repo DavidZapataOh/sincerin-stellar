@@ -235,6 +235,14 @@ fn main() -> ExitCode {
                 ExitCode::FAILURE
             }
         },
+        // Print the (reproducible) guest image id as 32-byte hex — same
+        // conversion `prove` writes to image_id.hex. Lets the build pipeline
+        // learn the canonical id (e.g. to pin it in the contract) without proving.
+        Some("image-id") => {
+            let image_id_hex = hex::encode(Digest::from(ROLLUP_GUEST_ID).as_bytes());
+            println!("{image_id_hex}");
+            ExitCode::SUCCESS
+        }
         other => {
             eprintln!(
                 "host: unknown subcommand {:?}\n\nusage:\n  cargo run -p host --release -- prove\n\n\
