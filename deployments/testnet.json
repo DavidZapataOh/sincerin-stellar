@@ -7,11 +7,21 @@
   "token_note": "native XLM Stellar Asset Contract (SAC) on testnet",
   "pool": "CBX7PGX4V5XGGYXEXBAEFHZBND6ZKYC5MYKDAAQI3RGDJALFN5GMSATH",
   "pool_levels": 3,
-  "rollup": "CDHQQZHEAUDAOIADG6RHLICQ7367ET4A7MI2LYS2J7XRLEDW6VBX5MPU",
+  "rollup": "CBKBSEZFSEJ2RYH3RX4NZDSLHVOEZVYGWVSSUGH4B25CV2CQMN5KH3PL",
+  "rollup_wasm_hash": "5285cc62305ef6d87ca125dfacf0b74384f5f680072a4d10e7a1b5258f12baf8",
+  "rollup_image_id_const": "cbeab7aa6ce69944e10cca8c7ed94d15aae297f2580752f07a15c6cab6ba0d46",
   "rollup_funded_stroops": "1000042",
+  "rollup_dead": {
+    "id": "CDHQQZHEAUDAOIADG6RHLICQ7367ET4A7MI2LYS2J7XRLEDW6VBX5MPU",
+    "note": "DEAD — pinned the STALE image_id 3f036c52…; replaced by the fresh rollup above whose wasm pins cbeab7aa… (PART C re-deploy)."
+  },
   "expected_merkle_root_le": "9e24c3e7b5c329b34a58f05a9840a90f051d6e5c97833c1d356f81323ef52119",
   "expected_merkle_root_u256_dec": "11367819772409864252604588583363811900671116702745926458574914206832615695518",
   "onchain_root_match": "YES",
+  "nullifiers": [
+    "c635ce4ece82e9a89efcae2bef04fcbdae81606edf760417358e6a8df198b219",
+    "52f39b3e09fbd5bc2d9cea6ba24a7d908dbf876cfe348fd31796c64bc1d6e02d"
+  ],
   "recipients": {
     "note0_leaf0": { "key": "lateo-agent-a", "G": "GB5MVC4HEWWBRF7TE3DVVS5F5K7EBJ37UMPKNDGXLL37SDTHLBIBINOL", "ed25519_hex": "7aca8b8725ac1897f326c75acba5eabe40a77fa31ea68cd75af7f90e67585014", "amount": 1000000 },
     "note1_leaf1": { "key": "lateo-agent-b", "G": "GCQUVGH54FBFO5PWI5FUK3FDCALUTS334JZIDKAZIRWAFJK7HCSAH5DF", "ed25519_hex": "a14a98fde1425775f6474b456ca3101749cb7be27281a819446c02a55f38a403", "amount": 42 }

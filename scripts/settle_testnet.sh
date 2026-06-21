@@ -33,11 +33,13 @@ RECIP_A="$(jqget "['recipients']['note0_leaf0']['G']")"
 RECIP_B="$(jqget "['recipients']['note1_leaf1']['G']")"
 AMT_A="$(jqget "['recipients']['note0_leaf0']['amount']")"
 AMT_B="$(jqget "['recipients']['note1_leaf1']['amount']")"
+SUM_AMT=$(( AMT_A + AMT_B ))
 
 echo "=== s2/03 PART C — settle N=2 on ${NETWORK} ==="
 echo "rollup:     ${ROLLUP}"
 echo "recipientA: ${RECIP_A} (+${AMT_A})"
 echo "recipientB: ${RECIP_B} (+${AMT_B})"
+echo "rollup debit expected: -${SUM_AMT}"
 echo ""
 
 for f in seal.hex image_id.hex journal.bin; do
@@ -51,13 +53,26 @@ JOURNAL_HEX="$(xxd -p "${RECEIPT_DIR}/journal.bin" | tr -d '[:space:]')"
 echo "seal[0..8]:  ${SEAL_HEX:0:16}..."
 echo "image_id:    ${IMAGE_ID_HEX}"
 echo "journal len: $(( ${#JOURNAL_HEX} / 2 )) bytes"
+
+# Extract the N nullifiers from the journal (layout: root 32B ‖ N u32-LE ‖ N×32B
+# nullifiers ‖ N×(recip 32B ‖ amount 16B)). These are the values the rollup marks
+# spent; we print them and (after settle) prove the replay reverts on them.
+read -r NF0 NF1 <<<"$(python3 - "${RECEIPT_DIR}/journal.bin" <<'PY'
+import sys,struct
+d=open(sys.argv[1],'rb').read()
+n=struct.unpack_from('<I',d,32)[0]
+print(*[d[36+i*32:36+(i+1)*32].hex() for i in range(n)])
+PY
+)"
+echo "nullifier[0]: ${NF0}"
+echo "nullifier[1]: ${NF1}"
 echo ""
 
-# Recipient balances BEFORE (stroops).
+# Recipient + rollup balances BEFORE (stroops).
 bal() { stellar contract invoke --id "${TOKEN}" --source "${SIGNER}" --network "${NETWORK}" \
   -- balance --id "$1" 2>/dev/null | tail -1 | tr -d '"[:space:]'; }
-A0="$(bal "${RECIP_A}")"; B0="$(bal "${RECIP_B}")"
-echo "balances before: A=${A0}  B=${B0}"
+A0="$(bal "${RECIP_A}")"; B0="$(bal "${RECIP_B}")"; R0="$(bal "${ROLLUP}")"
+echo "balances before: A=${A0}  B=${B0}  rollup=${R0}"
 
 # ── Submit settle_batch (REAL on-chain tx) ────────────────────────────────────
 echo "submitting settle_batch (--send=yes) ..."
@@ -78,12 +93,14 @@ STATUS="$(echo "${RESP}" | python3 -c "import sys,json;print(json.load(sys.stdin
 echo "settle tx status: ${STATUS}"
 [[ "${STATUS}" == "SUCCESS" ]] || { echo "ERROR: settle did not SUCCEED (${STATUS})" >&2; exit 1; }
 
-# ── Verify recipients credited by exactly the payout amounts ──────────────────
-A1="$(bal "${RECIP_A}")"; B1="$(bal "${RECIP_B}")"
-echo "balances after:  A=${A1}  B=${B1}"
+# ── Verify recipients credited + rollup debited by exactly the amounts ────────
+A1="$(bal "${RECIP_A}")"; B1="$(bal "${RECIP_B}")"; R1="$(bal "${ROLLUP}")"
+echo "balances after:  A=${A1}  B=${B1}  rollup=${R1}"
 [[ "$(( A1 - A0 ))" == "${AMT_A}" ]] || { echo "ERROR: recipient A delta $(( A1 - A0 )) != ${AMT_A}" >&2; exit 1; }
 [[ "$(( B1 - B0 ))" == "${AMT_B}" ]] || { echo "ERROR: recipient B delta $(( B1 - B0 )) != ${AMT_B}" >&2; exit 1; }
-echo "payouts credited exactly: A +${AMT_A}, B +${AMT_B} ✅"
+# Rollup pays both withdrawals from its own balance: it must drop by exactly the sum.
+[[ "$(( R0 - R1 ))" == "${SUM_AMT}" ]] || { echo "ERROR: rollup debit $(( R0 - R1 )) != ${SUM_AMT}" >&2; exit 1; }
+echo "payouts credited exactly: A +${AMT_A}, B +${AMT_B}; rollup -${SUM_AMT} ✅"
 
 # ── Verify double-spend protection: replaying the SAME batch must revert ───────
 echo "replay check (same batch must revert — nullifiers now spent) ..."
@@ -98,8 +115,11 @@ echo "replay reverted as expected (both nullifiers spent) ✅"
 echo ""
 echo "======================================================"
 echo "SETTLE N=2: SUCCESS"
-echo "tx hash:  ${TX_HASH}"
-echo "explorer: https://stellar.expert/explorer/testnet/tx/${TX_HASH}"
-echo "rollup:   ${ROLLUP}"
+echo "tx hash:    ${TX_HASH}"
+echo "explorer:   https://stellar.expert/explorer/testnet/tx/${TX_HASH}"
+echo "rollup:     ${ROLLUP}"
+echo "nullifiers: ${NF0}"
+echo "            ${NF1}  (both SPENT; replay reverted)"
+echo "deltas:     A +${AMT_A}  B +${AMT_B}  rollup -${SUM_AMT}"
 echo "======================================================"
 echo GATE_OK
