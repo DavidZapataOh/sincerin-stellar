@@ -15,9 +15,15 @@ testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
 soroban-sdk = { workspace = true }
-# Shared no_std primitives (journal codec etc.).
-zk-core     = { workspace = true }
+# NOTE: `zk-core` is intentionally NOT a runtime dependency of this contract.
+# The on-chain journal decoder (src/journal.rs) works on raw `soroban_sdk::Bytes`
+# and does NO field arithmetic, so it must never pull `ark-bn254`/`ark-ff` into
+# the wasm. `zk-core` appears only under [dev-dependencies] (host tests).
 
 [dev-dependencies]
 soroban-sdk = { workspace = true, features = ["testutils"] }
+# Host-side cross-check ONLY (tests/journal_interop.rs): the authoritative
+# Fr-based decoder. `std` pulls arkworks — fine for a native test binary, never
+# compiled into the contract wasm.
+zk-core     = { workspace = true, features = ["std"] }
 # Note: release profile is set in the workspace root Cargo.toml.

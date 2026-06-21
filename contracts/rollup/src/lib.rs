@@ -19,6 +19,9 @@
 
 use soroban_sdk::{contract, contractimpl, Env};
 
+/// Canonical journal decoder (mirror of `zk-core::journal`, raw `Bytes`).
+pub mod journal;
+
 /// Rollup contract.
 #[contract]
 pub struct RollupContract;
