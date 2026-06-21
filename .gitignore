@@ -10,6 +10,9 @@ node_modules/
 /frontend/.next/
 /frontend/dist/
 
+# Soroban test harness snapshots (regenerated on every `cargo test`)
+**/test_snapshots/
+
 # OS / editor
 .DS_Store
 *.swp

@@ -14,14 +14,19 @@ default  = []
 testutils = ["soroban-sdk/testutils"]
 
 [dependencies]
-soroban-sdk = { workspace = true }
+# `hazmat-address`: enables `AddressPayload`, the canonical + wasm-portable
+# raw-32-bytes → Address path (`recipient_to_address` in lib.rs). soroban-sdk has
+# NO other API to mint an account `Address` from a raw 32-byte ed25519 key inside
+# a contract (`from_string*` wants base-32 strkey; `from_payload` is gated behind
+# this exact feature). It is pure (XDR header ‖ bytes), so the binding stays exact.
+soroban-sdk = { workspace = true, features = ["hazmat-address"] }
 # NOTE: `zk-core` is intentionally NOT a runtime dependency of this contract.
 # The on-chain journal decoder (src/journal.rs) works on raw `soroban_sdk::Bytes`
 # and does NO field arithmetic, so it must never pull `ark-bn254`/`ark-ff` into
 # the wasm. `zk-core` appears only under [dev-dependencies] (host tests).
 
 [dev-dependencies]
-soroban-sdk = { workspace = true, features = ["testutils"] }
+soroban-sdk = { workspace = true, features = ["testutils", "hazmat-address"] }
 # Host-side cross-check ONLY (tests/journal_interop.rs): the authoritative
 # Fr-based decoder. `std` pulls arkworks — fine for a native test binary, never
 # compiled into the contract wasm.
