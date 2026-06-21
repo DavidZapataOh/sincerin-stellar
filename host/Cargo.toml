@@ -20,9 +20,5 @@ zk-core                  = { workspace = true, features = ["std"] }
 
 serde      = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-
-[dev-dependencies]
-# guest_exec.rs test: parse the golden JSON's little-endian hex vectors.
-# (Fr::from(u128) for the oracle resolves via the ark-bn254 re-export, so no
-# direct ark-ff dependency is needed.)
-hex = "0.4"
+# Parse golden LE-hex vectors + hex-encode the receipt artifacts (seal/image_id).
+hex        = "0.4"
