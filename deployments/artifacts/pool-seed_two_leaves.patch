@@ -1,0 +1,42 @@
+diff --git a/contracts/pool/src/pool.rs b/contracts/pool/src/pool.rs
+index e7ffebe..d0a98a9 100644
+--- a/contracts/pool/src/pool.rs
++++ b/contracts/pool/src/pool.rs
+@@ -750,6 +750,37 @@ impl PoolContract {
+         Ok(MerkleTreeWithHistory::is_known_root(env, root)?)
+     }
+ 
++    /// Insert two commitment leaves directly into the Merkle tree (admin-gated).
++    ///
++    /// This is a **seeding/bootstrap** entrypoint used by the Confidential Payments
++    /// Rollup integration (`stellar-private-payments` s2/03): it lets the operator
++    /// plant the golden note commitments at leaves `(NextIndex, NextIndex+1)` so the
++    /// pool's Merkle root advances to a known value WITHOUT routing through a full
++    /// `transact` (which would require a complete Groth16 withdrawal proof + ASP
++    /// roots). It delegates to the SAME `MerkleTreeWithHistory::insert_two_leaves`
++    /// the production `transact` path uses, so the resulting on-chain root is
++    /// byte-identical to a root produced by a real deposit — which is exactly what
++    /// the rollup must match against the zkVM guest's `merkle_root`.
++    ///
++    /// Requires admin authorization (the constructor `admin`). It does NOT verify
++    /// any proof, so it must remain admin-only and is intended for controlled
++    /// pool seeding in tests / demos, never as a user-facing deposit.
++    ///
++    /// # Arguments
++    ///
++    /// * `env` - The Soroban environment
++    /// * `leaf_1` - Left leaf (inserted at the even `NextIndex`)
++    /// * `leaf_2` - Right leaf (inserted at `NextIndex + 1`)
++    ///
++    /// # Returns
++    ///
++    /// The `(left_index, right_index)` where the leaves landed.
++    pub fn seed_two_leaves(env: Env, leaf_1: U256, leaf_2: U256) -> Result<(u32, u32), Error> {
++        let admin = Self::get_admin(&env)?;
++        admin.require_auth();
++        Ok(MerkleTreeWithHistory::insert_two_leaves(&env, leaf_1, leaf_2)?)
++    }
++
+     /// Update the contract administrator
+     ///
+     /// Transfers administrative control to a new address. Requires
