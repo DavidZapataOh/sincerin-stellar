@@ -1,0 +1,44 @@
+# PROVING-ONLY bench guest (s2/04). NEVER deployed / settled on-chain.
+#
+# WHY a SEPARATE crate (not a feature on `methods/guest`): the DEPLOYED guest's
+# image_id (cbeab7aa…) is bound by the on-chain `settle_batch` contract and MUST
+# stay byte-identical. risc0's image_id is a commitment over the full guest ELF,
+# which embeds DWARF/cfg metadata derived from the source — so adding ANY `#[cfg]`
+# / `cfg!()` / changed initializer to `methods/guest/src/main.rs` (even one that
+# constant-folds to the same depth-3 code) shifts the ELF and changes the
+# image_id (measured: pristine = cbeab7aa…, +one cfg attr = c2b15d04…). The only
+# way to keep the deployed guest reproducible AND benchmark larger depths is to
+# put the depth-switching in this standalone guest, whose image_id is allowed to
+# differ because it is proving-time-only and never bound on-chain.
+#
+# Depth is selected at compile time by a feature (default = 3 = the same depth as
+# the deployed guest, so a depth-3 bench build mirrors the deployed validity):
+#   default (no feature) → depth 3
+#   td4                  → depth 4 (N=16 proving bench)
+#   td5                  → depth 5 (N=32 proving bench)
+# `methods/build.rs` maps ROLLUP_TREE_DEPTH={4,5} to td4/td5 for this guest only.
+[workspace]
+
+[package]
+name    = "rollup-guest-bench"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "rollup-guest-bench"
+path = "src/main.rs"
+
+[features]
+default = []
+td4 = []
+td5 = []
+
+[dependencies]
+# EXACT pin to 3.0.5 — same as the deployed guest (AC5.2).
+risc0-zkvm = { version = "=3.0.5", default-features = false, features = ["std"] }
+# Shared validity primitives (byte-identical to the PoC) — the SAME zk-core the
+# deployed guest uses, so the bench proves the identical per-note crypto, only at
+# a deeper tree. Path is relative to methods/guest-bench/ → ../../crates/zk-core.
+zk-core = { path = "../../crates/zk-core", default-features = false, features = ["witness"] }

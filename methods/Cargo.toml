@@ -15,6 +15,10 @@ risc0-build = { workspace = true }
 # risc0-zkvm on the host side (full features) for ImageId type.
 risc0-zkvm = { workspace = true }
 
-# Tell risc0-build where the guest is.
+# Tell risc0-build where the guests are. `guest` = the DEPLOYED depth-3 guest
+# (image_id cbeab7aa…, bound on-chain). `guest-bench` = the PROVING-ONLY
+# depth-3/4/5 guest used solely for the N=16/32 proving-time benchmark (never
+# deployed; image_id may differ per depth). See methods/build.rs for why depth
+# switching lives on a separate guest rather than a feature on the deployed one.
 [package.metadata.risc0]
-methods = ["guest"]
+methods = ["guest", "guest-bench"]

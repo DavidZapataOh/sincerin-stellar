@@ -25,5 +25,20 @@
   "recipients": {
     "note0_leaf0": { "key": "lateo-agent-a", "G": "GB5MVC4HEWWBRF7TE3DVVS5F5K7EBJ37UMPKNDGXLL37SDTHLBIBINOL", "ed25519_hex": "7aca8b8725ac1897f326c75acba5eabe40a77fa31ea68cd75af7f90e67585014", "amount": 1000000 },
     "note1_leaf1": { "key": "lateo-agent-b", "G": "GCQUVGH54FBFO5PWI5FUK3FDCALUTS334JZIDKAZIRWAFJK7HCSAH5DF", "ed25519_hex": "a14a98fde1425775f6474b456ca3101749cb7be27281a819446c02a55f38a403", "amount": 42 }
+  },
+  "recipients_n8": {
+    "note": "s2/04 N=8 settle (depth 3, DEPLOYED guest cbeab7aa…). 8 FRESH notes (distinct secrets/blindings ⇒ 8 distinct nullifiers, none equal to the s2/03 spent c635ce4e…/52f39b3e…). Recipients are 8 REAL funded testnet accounts (lateo-agent-a..h), all friendbot-funded. Amounts are small (1000+i stroops), sum = 8028; the rollup's funded 1000042 stroops covers it. Inputs file: golden/n8_inputs.json (merkle_root_le 0x054be46b37e2cad7ab310dae784815e6fbbb0ad2785cafcd516dfa31c3daf314). NOTE: this depth-3 root is NOT yet seeded into the deployed pool — the controller's settle step must either seed these 8 commitments into the pool tree (so is_known_root accepts the root) or re-seed/redeploy, exactly as s2/03 did for the N=2 root. The recipients here are the payout targets to verify balance deltas against.",
+    "expected_merkle_root_le": "054be46b37e2cad7ab310dae784815e6fbbb0ad2785cafcd516dfa31c3daf314",
+    "leaves": [
+      { "i": 0, "key": "lateo-agent-a", "G": "GB5MVC4HEWWBRF7TE3DVVS5F5K7EBJ37UMPKNDGXLL37SDTHLBIBINOL", "ed25519_hex": "7aca8b8725ac1897f326c75acba5eabe40a77fa31ea68cd75af7f90e67585014", "amount": 1000 },
+      { "i": 1, "key": "lateo-agent-b", "G": "GCQUVGH54FBFO5PWI5FUK3FDCALUTS334JZIDKAZIRWAFJK7HCSAH5DF", "ed25519_hex": "a14a98fde1425775f6474b456ca3101749cb7be27281a819446c02a55f38a403", "amount": 1001 },
+      { "i": 2, "key": "lateo-agent-c", "G": "GARPLS6NQ42BA7Q4UJ4HHJHB53LEZ6JUB4TSFVMWA53APGZY4XRBMKBR", "ed25519_hex": "22f5cbcd8734107e1ca27873a4e1eed64cf9340f2722d5960776079b38e5e216", "amount": 1002 },
+      { "i": 3, "key": "lateo-agent-d", "G": "GDLSLBND2VJ3HSCBHZ5GMPMJL63JDSGYUR4TK3UQJAXWDYOSLZYK32HQ", "ed25519_hex": "d72585a3d553b3c8413e7a663d895fb691c8d8a479356e90482f61e1d25e70ad", "amount": 1003 },
+      { "i": 4, "key": "lateo-agent-e", "G": "GDKQQSFISI4JVQ5U64B265JLZVMUVBTIJ7XMLWA4JDCJGTFIHKTAIU5W", "ed25519_hex": "d50848a892389ac3b4f703af752bcd594a86684feec5d81c48c4934ca83aa604", "amount": 1004 },
+      { "i": 5, "key": "lateo-agent-f", "G": "GCEBF5OJPBW3ICVC5RIYZCSMGFKPL2WMV4LCOUFLAKWAOMTS2BO7BQOY", "ed25519_hex": "8812f5c9786db40aa2ec518c8a4c3154f5eaccaf162750ab02ac073272d05df0", "amount": 1005 },
+      { "i": 6, "key": "lateo-agent-g", "G": "GDVKFY2RNU63FA4WNGNNA6XS3CMT3EGEA7MNSPMJZK5BI6YCMIR5IVNR", "ed25519_hex": "eaa2e3516d3db28396699ad07af2d8993d90c407d8d93d89caba147b026223d4", "amount": 1006 },
+      { "i": 7, "key": "lateo-agent-h", "G": "GC3GELJDUJ2XWWMMTUJJ4G2PQTIVGMWHBUWMEUKUBPSGFGLQYN7NEZXS", "ed25519_hex": "b6622d23a2757b598c9d129e1b4f84d15332c70d2cc251540be4629970c37ed2", "amount": 1007 }
+    ],
+    "sum_amount": 8028
   }
 }
