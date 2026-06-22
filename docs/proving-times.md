@@ -13,12 +13,20 @@ el **proving off-chain sube** con N. Cada retirada es una hoja del árbol del po
 
 ## Eje 1 — proving off-chain (SUBE con N)
 
-| N | depth | cycles (reales) | proving wall-clock | medición |
-|---|-------|-----------------|--------------------|----------|
-| 2 | 3 | 30,670,848 | **~1h 14m** | **MEDIDO** (prove real Groth16) |
-| 8 | 3 | 122,683,392 | **4h 26m 07s** | **MEDIDO** (prove real Groth16) |
-| 16 | 4 | 263,192,576 | **~9h 19m** | **PROYECTADO** (¹) |
-| 32 | 5 | 561,512,448 | **~19h 40m** | **PROYECTADO** (²) |
+| N | depth | cycles (medidos, executor) | proving wall-clock |
+|---|-------|---------------------------|--------------------|
+| 2 | 3 | 30,670,848 | ~1h 14m · **MEDIDO** (prove Groth16 end-to-end real) |
+| 8 | 3 | 122,683,392 | 4h 26m 07s · **MEDIDO** (prove Groth16 end-to-end real) |
+| 16 | 4 | 263,192,576 | ~9h 19m · **PROYECTADO** (¹) |
+| 32 | 5 | 561,512,448 | ~19h 40m · **PROYECTADO** (²) |
+
+> **Provenance por celda (honestidad):** los **4 cycle counts son MEDIDOS** por el
+> executor (sin wrap; el de N=8 == el total del prover → método validado). El
+> **tiempo de proving es MEDIDO solo para N=2 y N=8** (prove real completo). **N=16
+> y N=32 son PROYECTADOS** — y **N=16 NO tiene tiempo medido**: su prove real
+> **FALLÓ a 7h38m en el wrap Groth16 sin producir receipt**, así que ese 7h38m es
+> solo un **ancla parcial del STARK**, no un tiempo end-to-end. No se mezcla medido
+> con proyectado en ninguna celda sin marcarlo.
 
 - **cycles**: valor REAL. Para N=2/8 = `prove_info.stats.total_cycles` del prover;
   para N=16/32 = cycles padded del **executor** (`sum 2^po2` por segmento), que es
