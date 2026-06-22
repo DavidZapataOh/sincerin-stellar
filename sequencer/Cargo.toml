@@ -1,0 +1,41 @@
+[package]
+name    = "sequencer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Single-operator sequencer (MVP): reserves notes, batches, proves async, settles on-chain."
+
+# The library crate (state machine, lock, collision, Prover trait).
+[lib]
+name = "sequencer"
+path = "src/lib.rs"
+
+# Production binary — runs LocalProver/RemoteProver only (no test-fixture feature).
+[[bin]]
+name = "sequencer"
+path = "src/main.rs"
+
+# Orchestration demo driver for the gate. Lives behind `required-features` so it
+# is ONLY compiled with `--features test-fixture` — `cargo build` (prod) skips it
+# entirely, keeping the FixtureProver structurally unreachable from production.
+[[bin]]
+name = "seq_demo"
+path = "src/bin/seq_demo.rs"
+required-features = ["test-fixture"]
+
+[features]
+default = []
+# Test-only: exposes the FixtureProver (which LOADS the real N=8 receipt from
+# disk). Gated so it is UNREACHABLE from the production binary (which builds with
+# no features → LocalProver/RemoteProver only). Enabled by the gate harness +
+# unit tests, NEVER by a plain `cargo build`.
+test-fixture = []
+
+[dependencies]
+# Shared crypto + the EXACT GuestInput/NoteWitness wire types the real prover
+# consumes (lock 3: byte-compatible). std for host-side use.
+zk-core     = { workspace = true, features = ["std"] }
+async-trait = "0.1"
+serde       = { version = "1", features = ["derive"] }
+serde_json  = "1"
+hex         = "0.4"
