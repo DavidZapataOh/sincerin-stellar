@@ -215,6 +215,12 @@ fn run_execute(inputs: &str) -> Result<(), String> {
         .execute(env, elf)
         .map_err(|e| format!("executor rejected the witness (guest panic): {e}"))?;
 
+    // Padded total cycles (== what the prover would prove: sum of 2^po2 over
+    // segments). Lets us anchor the proving-time projection for N=16/32 WITHOUT
+    // running the multi-hour Groth16 wrap.
+    let padded_cycles: u64 = session.segments.iter().map(|s| 1u64 << s.po2).sum();
+    println!("[execute] padded total cycles: {padded_cycles}");
+
     let d = print_journal("execute", &session.journal.bytes)?;
     if d.nullifiers.len() != n || d.payouts.len() != n {
         return Err(format!(
