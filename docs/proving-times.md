@@ -49,3 +49,4 @@ in `out/receipt/` is never clobbered.
 | N | depth | cycles | proving wall-clock | on-chain settle? |
 |---|-------|--------|--------------------|------------------|
 <!-- rows appended by scripts/proving_times.sh — one per N. Pending the controller's proves. -->
+| 8 | 3 | 122683392 | 4h26m07s | YES (deployed depth-3 guest, on testnet) |
