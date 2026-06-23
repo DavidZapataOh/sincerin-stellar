@@ -27,6 +27,7 @@ import { AggregationFlow } from "../components/AggregationFlow";
 import { FlowField } from "../components/FlowField";
 import { EcosystemStrip } from "../components/EcosystemStrip";
 import { Properties } from "../components/Properties";
+import { ProofCrystal } from "../components/ProofCrystal";
 import { SettleCard } from "../components/SettleCard";
 import { Counter } from "../components/Counter";
 import { LivePulse } from "../components/LivePulse";
@@ -189,27 +190,29 @@ function HowItWorks() {
   );
 }
 
-/* ── 7 · Why it stays cheap ─────────────────────────────────────────────── */
+/* ── 7 · Why it stays cheap — the rotating proof crystal (inverted) ──────── */
 function Scales() {
   return (
-    <section className="container section land-scales" aria-labelledby="scales-title">
-      <Reveal className="land-scales-copy">
-        <p className="land-kicker">One proof for the batch</p>
-        <h2 id="scales-title">Why it stays cheap.</h2>
-        <p className="prose">
-          Paying privately on-chain is expensive one payment at a time. Sincerin
-          proves a whole batch at once and verifies it a single time — so each
-          payment costs a fraction, and private payments work at real volume.
-        </p>
-        <p className="land-scales-honest">
-          Amounts settle in the open on Stellar — what stays private is who paid
-          whom.
-        </p>
-      </Reveal>
+    <section className="land-crystal invert section" aria-labelledby="scales-title">
+      <div className="container land-crystal-grid">
+        <Reveal className="land-crystal-copy">
+          <p className="land-kicker land-kicker--invert">One proof for the batch</p>
+          <h2 id="scales-title">Why it stays cheap.</h2>
+          <p className="land-crystal-lead">
+            The whole batch is proven once and verified a single time on Stellar —
+            so the on-chain cost barely moves whether you settle eight payments or
+            eighty.
+          </p>
+          <p className="land-crystal-honest">
+            Amounts settle in the open on Stellar; what stays private is who paid
+            whom.
+          </p>
+        </Reveal>
 
-      <Reveal className="land-scales-viz" delay={100}>
-        <AggregationFlow n={6} variant="showpiece" />
-      </Reveal>
+        <Reveal className="land-crystal-viz" delay={120}>
+          <ProofCrystal n={8} />
+        </Reveal>
+      </div>
     </section>
   );
 }
