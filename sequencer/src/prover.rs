@@ -190,15 +190,81 @@ mod fixture {
         }
     }
 
+    impl FixtureProver {
+        /// The honest dev/demo delay (seconds) read from `FIXTURE_PROVE_DELAY`.
+        /// Defaults to 0 (no delay). This is NOT a fake proof — it only sleeps
+        /// BEFORE returning the **real** receipt, so the async UX (the `proving`
+        /// state) can be exercised without a GPU. The receipt, settle, and verifier
+        /// are all real (cero-mocks intact).
+        pub fn prove_delay() -> std::time::Duration {
+            let secs = std::env::var("FIXTURE_PROVE_DELAY")
+                .ok()
+                .and_then(|s| s.trim().parse::<u64>().ok())
+                .unwrap_or(0);
+            std::time::Duration::from_secs(secs)
+        }
+    }
+
     #[async_trait]
     impl Prover for FixtureProver {
         async fn prove(&self, _input: GuestInput) -> Result<ProvedBatch, ProverError> {
+            // Honest dev/demo delay: sleep BEFORE returning the real receipt so the
+            // async UX (the `proving` state) is visible without a GPU. NOT a fake
+            // proof — the receipt below is the real on-disk N=8 receipt.
+            let delay = Self::prove_delay();
+            if !delay.is_zero() {
+                tokio::time::sleep(delay).await;
+            }
             // LOAD the real file — never hand-build a ProvedBatch.
             load_proved_batch(&self.receipt_dir)
         }
 
         fn backend_label(&self) -> &'static str {
             "fixture(real N=8 receipt, test-only)"
+        }
+    }
+
+    #[cfg(test)]
+    mod fixture_tests {
+        use super::*;
+
+        /// With `FIXTURE_PROVE_DELAY` set, the fixture prove sleeps at least that
+        /// long BEFORE returning the real receipt (it still returns the real one).
+        #[tokio::test]
+        async fn fixture_prove_delay_is_respected() {
+            // Use a tiny but observable delay to keep the test fast.
+            std::env::set_var("FIXTURE_PROVE_DELAY", "1");
+            let dur = FixtureProver::prove_delay();
+            assert_eq!(dur, std::time::Duration::from_secs(1));
+
+            // The delay actually elapses on the prove path (real receipt loaded).
+            let receipt_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .parent()
+                .unwrap()
+                .join("out/bench/n8");
+            let prover = FixtureProver::new(&receipt_dir);
+            let start = std::time::Instant::now();
+            let proved = prover
+                .prove(GuestInput {
+                    notes: vec![],
+                    merkle_root: [0u8; 32],
+                })
+                .await
+                .expect("real receipt loads");
+            assert!(
+                start.elapsed() >= std::time::Duration::from_secs(1),
+                "delay must elapse before returning"
+            );
+            // It is the REAL receipt (a real Groth16 seal is > 64 bytes).
+            assert!(proved.seal.len() > 64, "real receipt, not fabricated");
+            std::env::remove_var("FIXTURE_PROVE_DELAY");
+        }
+
+        /// With the env var unset, there is no delay (default 0).
+        #[test]
+        fn fixture_prove_delay_defaults_to_zero() {
+            std::env::remove_var("FIXTURE_PROVE_DELAY");
+            assert!(FixtureProver::prove_delay().is_zero());
         }
     }
 }

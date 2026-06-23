@@ -7,15 +7,22 @@
 //! selection is pure config (`PROVER_BACKEND=local|remote`); the sequencer's
 //! state machine, lock, and collision logic never change between them.
 //!
-//! This MVP binary is a thin CLI around the library: it prints the trust-boundary
-//! banner and the selected backend, then would run the async batching loop. The
-//! orchestration is exercised end-to-end (with the REAL N=8 receipt + REAL
-//! verifier) by `scripts/seq_demo.sh`, which drives the `seq_demo` binary built
-//! ONLY with `--features test-fixture`.
+//! Subcommands:
+//! - (default) — print the trust-boundary banner + selected backend.
+//! - `serve` — wire `LocalProver` + `StellarCliSettler`, serve the HTTP API
+//!   (s3/02) the frontend talks to. The on-chain settle is REAL
+//!   (`stellar contract invoke … settle_batch`); there is NO fixture/dev-mode/mock
+//!   anywhere on this path.
+//!
+//! Settle config is read from env: `ROLLUP_ID` (the deployed rollup `C…`),
+//! `SIGNER` (the `--source` key), `NETWORK` (default `testnet`). HTTP bind from
+//! `BIND` (default `127.0.0.1:8787`). Batch knobs from `N_TARGET`/`BATCH_TIMEOUT`.
 
 use std::path::PathBuf;
 
+use sequencer::pipeline::Config;
 use sequencer::prover::{LocalProver, Prover};
+use sequencer::settler::{Settler, StellarCliSettler};
 
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -43,7 +50,37 @@ fn select_prover() -> Result<Box<dyn Prover>, String> {
     }
 }
 
-fn main() -> std::process::ExitCode {
+/// Build the REAL settler from env (`ROLLUP_ID`, `SIGNER`, `NETWORK`). There is no
+/// mock settler in production — this always shells out to `stellar contract invoke`.
+fn select_settler(network: &str) -> Result<Box<dyn Settler>, String> {
+    let rollup_id = std::env::var("ROLLUP_ID")
+        .map_err(|_| "ROLLUP_ID env required (the deployed rollup C… to settle against)")?;
+    let source = std::env::var("SIGNER").unwrap_or_else(|_| "spikekey".to_string());
+    Ok(Box::new(StellarCliSettler::new(rollup_id, source, network)))
+}
+
+/// Build the runtime [`Config`] from env (`N_TARGET`, `BATCH_TIMEOUT`, `NETWORK`,
+/// `ROLLUP_ID`).
+fn build_config() -> Config {
+    let mut cfg = Config::testnet_defaults();
+    cfg.network = std::env::var("NETWORK").unwrap_or_else(|_| "testnet".to_string());
+    cfg.explorer_base = format!("https://stellar.expert/explorer/{}/tx/", cfg.network);
+    if let Ok(id) = std::env::var("ROLLUP_ID") {
+        cfg.rollup_id = id;
+    }
+    if let Some(n) = std::env::var("N_TARGET").ok().and_then(|s| s.parse().ok()) {
+        cfg.n_target = n;
+    }
+    if let Some(s) = std::env::var("BATCH_TIMEOUT")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+    {
+        cfg.batch_timeout = std::time::Duration::from_secs(s);
+    }
+    cfg
+}
+
+fn print_banner() {
     println!("=== Confidential Payments Rollup — sequencer (single-operator MVP) ===");
     println!(
         "TRUST BOUNDARY (AC4.4): the operator receives note secrets (Diseño B) and \
@@ -54,20 +91,68 @@ fn main() -> std::process::ExitCode {
         "ZK LATENCY: the prove is multi-hour; every rollup batches+proves off-chain. \
          submit() returns a request_id immediately and never blocks — poll get_status()."
     );
+}
 
-    match select_prover() {
-        Ok(p) => {
-            println!("[sequencer] prover backend: {}", p.backend_label());
-            println!(
-                "[sequencer] MVP CLI ready. The async batching loop + on-chain settle are \
-                 demonstrated end-to-end (REAL N=8 receipt, REAL verifier) by \
-                 `bash scripts/seq_demo.sh`."
-            );
-            std::process::ExitCode::SUCCESS
+/// `sequencer serve` — wire LocalProver + StellarCliSettler, serve the HTTP API.
+async fn run_serve() -> Result<(), String> {
+    let cfg = build_config();
+    let prover = select_prover()?;
+    let settler = select_settler(&cfg.network)?;
+
+    print_banner();
+    println!("[sequencer] prover backend : {}", prover.backend_label());
+    println!("[sequencer] settler backend: {}", settler.backend_label());
+
+    let addr: std::net::SocketAddr = std::env::var("BIND")
+        .unwrap_or_else(|_| "127.0.0.1:8787".to_string())
+        .parse()
+        .map_err(|e| format!("bad BIND addr: {e}"))?;
+    println!(
+        "[sequencer] HTTP API on http://{addr}  (POST /submit · GET /status/:id · \
+         GET /recent_batches · GET /config) — N_target={}",
+        cfg.n_target
+    );
+    sequencer::http::serve(addr, prover, settler, cfg).await
+}
+
+fn main() -> std::process::ExitCode {
+    let cmd = std::env::args().nth(1);
+    match cmd.as_deref() {
+        Some("serve") => {
+            // Build a multi-thread runtime only for the serving path.
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => rt,
+                Err(e) => {
+                    eprintln!("[sequencer] ERROR: tokio runtime: {e}");
+                    return std::process::ExitCode::FAILURE;
+                }
+            };
+            match rt.block_on(run_serve()) {
+                Ok(()) => std::process::ExitCode::SUCCESS,
+                Err(e) => {
+                    eprintln!("[sequencer] ERROR: {e}");
+                    std::process::ExitCode::FAILURE
+                }
+            }
         }
-        Err(e) => {
-            eprintln!("[sequencer] ERROR: {e}");
-            std::process::ExitCode::FAILURE
+        _ => {
+            // Default: the MVP banner + backend selection sanity check (no serve).
+            print_banner();
+            match select_prover() {
+                Ok(p) => {
+                    println!("[sequencer] prover backend: {}", p.backend_label());
+                    println!(
+                        "[sequencer] MVP CLI ready. Run `sequencer serve` to expose the HTTP API \
+                         (the frontend connection layer). The async batching loop + on-chain \
+                         settle are also exercised by `bash scripts/seq_demo.sh`."
+                    );
+                    std::process::ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("[sequencer] ERROR: {e}");
+                    std::process::ExitCode::FAILURE
+                }
+            }
         }
     }
 }

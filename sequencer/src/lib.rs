@@ -23,7 +23,10 @@
 use std::collections::BTreeMap;
 
 pub mod batch;
+pub mod http;
+pub mod pipeline;
 pub mod prover;
+pub mod settler;
 pub mod types;
 
 use types::{RequestId, Status, WithdrawalIntent};
