@@ -13,7 +13,7 @@
  * Sections (top → bottom):
  *   1 Hero (inverted)            — Many private payments. One transaction.
  *   2 Ecosystem strip            — Runs on Stellar. Proofs by RISC Zero.
- *   3 Why Sincerin               — Private payments that actually scale.
+ *   3 Properties (live cards)    — many→one · unlinkable · settles on Stellar
  *   4 Signature showpiece        — the aggregation, big + animated
  *   5 Typographic beat (inverted)— N payments. 1 transaction.
  *   6 How it works               — Many payments in. One transaction out.
@@ -26,6 +26,7 @@ import { Link } from "../lib/router";
 import { AggregationFlow } from "../components/AggregationFlow";
 import { FlowField } from "../components/FlowField";
 import { EcosystemStrip } from "../components/EcosystemStrip";
+import { Properties } from "../components/Properties";
 import { SettleCard } from "../components/SettleCard";
 import { Counter } from "../components/Counter";
 import { LivePulse } from "../components/LivePulse";
@@ -37,7 +38,7 @@ export function Landing() {
     <main id="main" className="land">
       <Hero />
       <Ecosystem />
-      <Why />
+      <Properties />
       <Showpiece />
       <TypeBeat />
       <HowItWorks />
@@ -98,45 +99,6 @@ function Ecosystem() {
           <EcosystemStrip />
         </Reveal>
       </div>
-    </section>
-  );
-}
-
-/* ── 3 · Why Sincerin (3 benefits, editorial ledger) ────────────────────── */
-function Why() {
-  const benefits = [
-    {
-      k: "scale",
-      h: "Many payments, one transaction",
-      p: "Sincerin settles a whole batch of private payments together on Stellar — dozens at the cost of one.",
-    },
-    {
-      k: "private",
-      h: "Unlinkable",
-      p: "Senders and recipients can’t be tied together. Who paid whom stays private.",
-    },
-    {
-      k: "real",
-      h: "Real, final, on Stellar",
-      p: "Settled directly on Stellar — no bridges, no wrapped tokens, no middlemen.",
-    },
-  ];
-  return (
-    <section className="container section land-why" aria-labelledby="why-title">
-      <Reveal className="land-why-head">
-        <p className="land-kicker">Why Sincerin</p>
-        <h2 id="why-title">Private payments that actually scale.</h2>
-      </Reveal>
-
-      <ul className="land-why-ledger">
-        {benefits.map((b, i) => (
-          <Reveal as="li" key={b.k} className="ledger-row" delay={i * 80}>
-            <span className="ledger-mark" aria-hidden="true" />
-            <h3 className="ledger-h">{b.h}</h3>
-            <p className="ledger-p">{b.p}</p>
-          </Reveal>
-        ))}
-      </ul>
     </section>
   );
 }
