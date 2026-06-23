@@ -62,6 +62,7 @@ export function Footer(props: Props) {
             </div>
             <div className="appfoot-nav">
               <p className="appfoot-nav-head">Learn</p>
+              <Link to="/benchmarks">Benchmarks</Link>
               <span className="appfoot-soon">
                 Documentation <em>soon</em>
               </span>

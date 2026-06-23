@@ -58,7 +58,7 @@ describe("data == docs/proving-times.md (no re-measure, provenance per cell)", (
     expect(n8.provingGpuFlag).toBe("measured");
     expect(n8.provingCpuSeconds).toBe(15967); // 4h26m07s (Mac dev)
     // production is dramatically faster than dev — the story the judge must see
-    expect(n8.provingCpuSeconds / n8.provingGpuSeconds).toBeGreaterThan(40);
+    expect(n8.provingCpuSeconds / n8.provingGpuSeconds!).toBeGreaterThan(40);
   });
 });
 
@@ -103,5 +103,22 @@ describe("honesty lint: never flat/plano/constant about the aggregate", () => {
     const labels = [...src.matchAll(/crystal-note-l">([^<]*)</g)].map((m) => m[1]);
     expect(labels.length).toBeGreaterThan(0);
     for (const label of labels) expect(label).not.toMatch(FORBIDDEN);
+  });
+
+  it("no deliverable claims the AGGREGATE cost is constant/flat in N (the exact overclaim)", () => {
+    // Precise patterns: these phrasings only ever describe the aggregate TOTAL —
+    // the honest "~constant Groth16 verification" (the subcomponent) and explicit
+    // negations ("not flat", "NO es plano") are intentionally NOT matched.
+    const OVERCLAIM = /\b(constant in n|constante en n|constant cost regardless|flat in n|plano en n)\b/i;
+    const files = [
+      resolve(here, "../components/ProofCrystal.tsx"),
+      resolve(here, "../../../README.md"),
+      resolve(here, "../../../docs/proving-times.md"),
+    ];
+    for (const f of files) {
+      expect(readFileSync(f, "utf8"), `${f} claims the aggregate is constant/flat in N`).not.toMatch(
+        OVERCLAIM,
+      );
+    }
   });
 });

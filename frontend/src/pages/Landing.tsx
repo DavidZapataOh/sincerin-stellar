@@ -201,8 +201,8 @@ function Scales() {
           <h2 id="scales-title">Why it stays cheap.</h2>
           <p className="land-crystal-lead">
             The whole batch is proven once and verified a single time on Stellar —
-            so the on-chain cost barely moves whether you settle eight payments or
-            eighty.
+            so the on-chain cost grows slowly with the batch instead of multiplying
+            with every payment, staying well inside one transaction&rsquo;s budget.
           </p>
           <p className="land-crystal-honest">
             Amounts settle in the open on Stellar; what stays private is who paid

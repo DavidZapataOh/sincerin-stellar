@@ -1779,3 +1779,147 @@
     transform: none;
   }
 }
+
+/* ============================================================================
+   /benchmarks — the two-axis benchmark surface (s3/01). B&W editorial; the
+   crossover chart is the focus. Provenance chips per cell; the infeasible
+   baseline is the one place a functional red appears (a failure state).
+   ========================================================================= */
+.bm-hero {
+  padding-bottom: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+}
+.bm-title {
+  font-size: var(--fs-h2);
+  max-width: 24ch;
+  margin-top: var(--s-2);
+}
+.bm-lead {
+  margin-top: var(--s-3);
+  font-size: var(--fs-lead);
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 64ch;
+}
+.bm-section {
+  padding-block: clamp(2rem, 1.4rem + 2.4vw, 3.5rem);
+  border-top: 1px solid var(--line);
+}
+.bm-section-head {
+  max-width: 70ch;
+  margin-bottom: var(--s-4);
+}
+.bm-section-head h2 {
+  font-size: var(--fs-h3);
+  max-width: 26ch;
+}
+.bm-section-sub {
+  margin-top: var(--s-2);
+  font-size: var(--fs-body);
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 68ch;
+}
+.bm-section-sub strong {
+  color: var(--ink);
+}
+
+/* charts: the generated SVG scales to the column width */
+.bm-chart {
+  border: 1px solid var(--line);
+  background: var(--bg);
+  padding: clamp(0.75rem, 0.4rem + 1.5vw, 1.5rem);
+}
+.bm-chart-svg svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* the two-axis table */
+.bm-table-wrap {
+  overflow-x: auto;
+}
+.bm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--fs-sm);
+  min-width: 720px;
+}
+.bm-table th,
+.bm-table td {
+  text-align: left;
+  padding: 0.7rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: baseline;
+}
+.bm-table th {
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--muted);
+  letter-spacing: 0.01em;
+  border-bottom: 1px solid var(--ink);
+  white-space: nowrap;
+}
+.bm-table tbody tr:hover {
+  background: var(--surface);
+}
+.bm-n {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+.bm-num {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.bm-muted {
+  color: var(--muted);
+}
+.bm-dash {
+  color: var(--muted);
+}
+.bm-note {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  max-width: 28ch;
+  line-height: 1.4;
+}
+.bm-infeasible-tag {
+  color: var(--state-failed-ink);
+  font-weight: 600;
+}
+
+/* provenance chips */
+.bm-chip {
+  display: inline-block;
+  font-family: var(--font-data);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.08em 0.45em;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.bm-chip--measured {
+  background: var(--ink);
+  color: var(--bg);
+}
+.bm-chip--projected {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+}
+.bm-method code {
+  font-family: var(--font-data);
+  font-size: 0.85em;
+  background: var(--surface);
+  padding: 0.1em 0.35em;
+}
+.bm a {
+  color: var(--ink);
+  text-underline-offset: 0.2em;
+}

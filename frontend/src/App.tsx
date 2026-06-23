@@ -15,9 +15,14 @@ import { DemoApp } from "./pages/DemoApp";
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
 import { NotFound } from "./pages/NotFound";
+import { Benchmarks } from "./pages/Benchmarks";
 
 export function App() {
   const { path } = useRouter();
+
+  if (path === "/benchmarks") {
+    return <Benchmarks />;
+  }
 
   if (path === "/") {
     return (
