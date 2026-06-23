@@ -208,8 +208,10 @@
 }
 .ecostrip-item {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
+  justify-content: flex-start;
+  gap: 0.6rem;
   padding-inline: clamp(0.75rem, 0.4rem + 1.2vw, 1.6rem);
   border-left: 1px solid var(--line);
   min-width: 0;
@@ -218,27 +220,38 @@
   border-left: none;
   padding-left: 0;
 }
-.ecostrip-glyph {
-  display: inline-flex;
-  color: var(--ink);
-  flex: none;
-}
-.ecostrip-text {
+/* uniform optical box: every mark is centered in the same height; widths vary
+   (a wordmark is wider than a symbol) but object-fit keeps them all balanced. */
+.ecostrip-media {
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  height: 42px;
+  width: 100%;
 }
-.ecostrip-name {
-  font-weight: 600;
-  font-size: var(--fs-body);
-  letter-spacing: -0.01em;
-  white-space: nowrap;
+.ecostrip-logo {
+  max-height: 40px;
+  max-width: 100%;
+  width: auto;
+  object-fit: contain;
+  /* normalise to a single monochrome reading so the row isn't a mismatch of
+     blue/black/inverted marks against the B&W brand. */
+  filter: grayscale(1) contrast(1.05);
+  opacity: 0.88;
+  transition: opacity 0.2s ease;
 }
-.ecostrip-role {
-  font-size: var(--fs-xs);
-  color: var(--muted);
-  white-space: nowrap;
+.ecostrip-item:hover .ecostrip-logo {
+  opacity: 1;
+}
+/* Soroban is a full wordmark — its width is capped by the cell, so it sits a
+   little shorter than the square marks; this keeps it legible, not tiny. */
+.ecostrip-logo--wide {
+  max-height: 30px;
+}
+/* RISC Zero ships white-on-black; invert it to black-on-white to match the rest
+   (grayscale then neutralises any residual tint). */
+.ecostrip-logo--risc0 {
+  filter: grayscale(1) invert(1);
 }
 @media (max-width: 860px) {
   .ecostrip {
