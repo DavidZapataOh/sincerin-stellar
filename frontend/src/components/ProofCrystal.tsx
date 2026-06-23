@@ -14,8 +14,9 @@
  * frame under prefers-reduced-motion (the object's meaning never needs motion).
  *
  * The real, measured numbers are annotated around it (8.8% of a block's budget,
- * constant in N, 1 on-chain verification) — engraved on the specimen, not in a
- * table.
+ * sub-linear in N, 1 on-chain verification) — engraved on the specimen, not in a
+ * table. Honest framing: the on-chain cost GROWS with N (31.5M→56.1M), just far
+ * slower than the budget — never "constant"/"flat" (see docs/proving-times.md).
  */
 
 import { useEffect, useRef } from "react";
@@ -259,8 +260,8 @@ export function ProofCrystal({ n = 8 }: Props) {
           <span className="crystal-note-l">of a block&rsquo;s budget</span>
         </li>
         <li className="crystal-note crystal-note--b">
-          <span className="crystal-note-n">constant</span>
-          <span className="crystal-note-l">in N — the cost barely moves</span>
+          <span className="crystal-note-n">sub-linear</span>
+          <span className="crystal-note-l">in N — stays within budget as N grows</span>
         </li>
         <li className="crystal-note crystal-note--c">
           <span className="crystal-note-n">1</span>

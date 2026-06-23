@@ -1,9 +1,12 @@
 # Benchmark de dos ejes — proving off-chain vs costo on-chain, por N (CONTEXT.md D2 / D6)
 
 El diferenciador del proyecto: **agregar N retiradas en 1 receipt** hace que el
-**costo on-chain quede ~plano** (1 verificación Groth16, constante en N) mientras
-el **proving off-chain sube** con N. Cada retirada es una hoja del árbol del pool;
-`depth = ceil(log2 N)` (N=8→3, N=16→4, N=32→5).
+**costo on-chain crezca sub-linealmente** (1 verificación Groth16 ~constante + N
+transferencias chicas), manteniéndose **muy dentro del budget** mientras el
+**proving off-chain sube** con N. El costo on-chain del agregado NO es plano —
+crece 31.5M→56.1M de N=2 a N=32 — pero lo hace mucho más lento que el budget,
+y mucho más lento que el baseline (N verificaciones sueltas). Cada retirada es una
+hoja del árbol del pool; `depth = ceil(log2 N)` (N=8→3, N=16→4, N=32→5).
 
 - **N=8 (depth 3)** = **demo on-chain**: probado con el **guest DESPLEGADO**
   (`image_id cbeab7aa6ce69944e10cca8c7ed94d15aae297f2580752f07a15c6cab6ba0d46`, el
@@ -13,20 +16,26 @@ el **proving off-chain sube** con N. Cada retirada es una hoja del árbol del po
 
 ## Eje 1 — proving off-chain (SUBE con N)
 
-| N | depth | cycles (medidos, executor) | proving wall-clock |
-|---|-------|---------------------------|--------------------|
-| 2 | 3 | 30,670,848 | ~1h 14m · **MEDIDO** (prove Groth16 end-to-end real) |
-| 8 | 3 | 122,683,392 | 4h 26m 07s · **MEDIDO** (prove Groth16 end-to-end real) |
-| 16 | 4 | 263,192,576 | ~9h 19m · **PROYECTADO** (¹) |
-| 32 | 5 | 561,512,448 | ~19h 40m · **PROYECTADO** (²) |
+| N | depth | cycles (medidos, executor) | proving CPU (Mac M-series, **desarrollo**) | proving GPU (RTX 3090, **producción**) |
+|---|-------|---------------------------|--------------------------------------------|----------------------------------------|
+| 2 | 3 | 30,670,848 | ~1h 14m · **MEDIDO** | — |
+| 8 | 3 | 122,683,392 | 4h 26m 07s · **MEDIDO** | **5m 04s · MEDIDO** (PARADA 1) |
+| 16 | 4 | 263,192,576 | ~9h 19m · **PROYECTADO** (¹) | — |
+| 32 | 5 | 561,512,448 | ~19h 40m · **PROYECTADO** (²) | — |
 
+> **El número de producción es minutos, no horas.** El proving real de N=8 en GPU
+> (RTX 3090, `make prove` con CUDA nativo) midió **5m 04s** — **~52× más rápido** que
+> los 4h 26m del Mac. Las horas de la columna CPU son artefacto de **desarrollo**
+> (emulación x86-on-ARM con Docker para el wrap STARK→Groth16); en producción el
+> proving es de **minutos**. Mostrar solo las horas del Mac subvendería el sistema.
+>
 > **Provenance por celda (honestidad):** los **4 cycle counts son MEDIDOS** por el
 > executor (sin wrap; el de N=8 == el total del prover → método validado). El
-> **tiempo de proving es MEDIDO solo para N=2 y N=8** (prove real completo). **N=16
-> y N=32 son PROYECTADOS** — y **N=16 NO tiene tiempo medido**: su prove real
-> **FALLÓ a 7h38m en el wrap Groth16 sin producir receipt**, así que ese 7h38m es
-> solo un **ancla parcial del STARK**, no un tiempo end-to-end. No se mezcla medido
-> con proyectado en ninguna celda sin marcarlo.
+> **tiempo CPU es MEDIDO solo para N=2 y N=8** (prove real completo); **N=16 y N=32
+> son PROYECTADOS** — y **N=16 NO tiene tiempo CPU medido**: su prove real **FALLÓ a
+> 7h38m en el wrap Groth16 sin producir receipt**, así que ese 7h38m es solo un
+> **ancla parcial del STARK**, no end-to-end. El **tiempo GPU es MEDIDO solo para
+> N=8** (PARADA 1, RTX 3090). No se mezcla medido con proyectado sin marcarlo.
 
 - **cycles**: valor REAL. Para N=2/8 = `prove_info.stats.total_cycles` del prover;
   para N=16/32 = cycles padded del **executor** (`sum 2^po2` por segmento), que es
@@ -41,7 +50,7 @@ el **proving off-chain sube** con N. Cada retirada es una hoja del árbol del po
     de Docker el wrap cerraría; el cuello es el wrap emulado, no el STARK.
   - (²) **N=32 no se intentó** (≈20h + fallaría igual a 7.65 GiB). Proyectado.
 
-## Eje 2 — costo on-chain del settle (~PLANO en N)
+## Eje 2 — costo on-chain del settle (sub-lineal en N, dentro del budget)
 
 | N | settle cpu_insn | % de 400M | medición | baseline = N verificaciones individuales |
 |---|-----------------|-----------|----------|------------------------------------------|
@@ -53,10 +62,11 @@ el **proving off-chain sube** con N. Cada retirada es una hoja del árbol del po
 - (³) settle = 1 verificación Groth16 (~constante, ~31.5M) + N×(`assert !spent;mark`
   + `transfer`). De N=2→N=8 medido: 31.5M→36.1M = +4.6M por +6 notas ≈ 0.77M/nota,
   lineal pequeño. Proyección N=16/32 = `31.5M + 0.77M·N`.
-- **El punto:** el settle agregado se mantiene **~plano (~9–14% del budget)**,
-  mientras el baseline (N verificaciones sueltas del pool) crece lineal y **a partir
-  de N≈12 ni siquiera cabe en el budget de 1 tx (400M)**. La agregación no es solo
-  más barata: **habilita batches que de otro modo serían imposibles on-chain.**
+- **El punto:** el settle agregado **crece sub-linealmente (~8→14% del budget de
+  N=2 a N=32)** — NO es plano, pero crece despacio — mientras el baseline (N
+  verificaciones sueltas del pool) crece lineal y **a partir de N≈12 ni siquiera
+  cabe en el budget de 1 tx (400M)**. La agregación no es solo más barata:
+  **habilita batches que de otro modo serían imposibles on-chain.**
 
 ## Evidencia on-chain (testnet, reproducible)
 
