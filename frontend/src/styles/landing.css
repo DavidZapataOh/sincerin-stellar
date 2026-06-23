@@ -103,6 +103,13 @@
   z-index: 0;
 }
 
+/* ── Hero art — the CipherRipple lattice that sits in the hero viz slot ──── */
+.hero-art {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
 /* ── 1 · Hero ───────────────────────────────────────────────────────────── */
 .land-hero {
   position: relative;

@@ -28,6 +28,7 @@ import { FlowField } from "../components/FlowField";
 import { EcosystemStrip } from "../components/EcosystemStrip";
 import { Properties } from "../components/Properties";
 import { ProofCrystal } from "../components/ProofCrystal";
+import { CipherRipple } from "../components/CipherRipple";
 import { SettleCard } from "../components/SettleCard";
 import { Counter } from "../components/Counter";
 import { LivePulse } from "../components/LivePulse";
@@ -84,7 +85,7 @@ function Hero() {
         </div>
 
         <div className="land-hero-viz">
-          <AggregationFlow n={7} variant="hero" />
+          <CipherRipple />
         </div>
       </div>
     </section>
