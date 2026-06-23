@@ -734,6 +734,104 @@
   color: var(--muted);
   line-height: 1.5;
 }
+/* once proving, the batch is sealed → the card border firms up to ink */
+.fillcard.is-sealed {
+  border-color: var(--ink);
+}
+.fillcard-sealed {
+  color: var(--state-proving-ink);
+  font-weight: 500;
+}
+
+/* ── Proving meter (elapsed clock + honest indeterminate bar) ───────────── */
+.provemeter {
+  margin-top: var(--s-4);
+  border-top: 1px solid var(--ink);
+  padding-top: var(--s-3);
+}
+.provemeter-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+}
+.provemeter-status {
+  display: inline-flex;
+}
+.provemeter-status .livepulse {
+  font-size: var(--fs-body);
+  font-weight: 600;
+}
+.provemeter-clock {
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.5rem);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.provemeter-track {
+  position: relative;
+  height: 8px;
+  margin-top: var(--s-2);
+  /* a present (not faint) track: hairline-marked ticks so the moving band
+     always reads against structure, at any sweep position */
+  background: repeating-linear-gradient(
+    90deg,
+    var(--line) 0 1px,
+    transparent 1px 14px
+  );
+  border: 1px solid var(--ink);
+  overflow: hidden;
+}
+/* the moving highlight: a solid monochrome band that sweeps L→R, indefinitely.
+   Wide + ink-solid so it is unmistakably "the moving element" in any still. */
+.provemeter-sweep {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 42%;
+  background: var(--ink);
+  animation: prove-sweep 2s var(--ease-out-quart) infinite alternate;
+}
+/* the reduced-motion fallback: a static partial fill, no sweep */
+.provemeter-still {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--ink) 0 6px,
+    transparent 6px 12px
+  );
+  opacity: 0.85;
+}
+/* bounce L↔R (alternate) keeps the band on-track at every instant — no frame
+   catches it off-screen, so the moving bar is always visible in a screenshot. */
+@keyframes prove-sweep {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(138%); /* (100-42)/42 ≈ 1.38 → right edge flush */
+  }
+}
+.provemeter-hint {
+  margin-top: var(--s-2);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.5;
+}
+@media (prefers-reduced-motion: reduce) {
+  .provemeter-sweep {
+    display: none;
+  }
+  .provemeter-still {
+    display: block;
+  }
+}
+
 .waitnote {
   font-size: var(--fs-sm);
   color: var(--muted);

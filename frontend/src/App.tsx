@@ -191,6 +191,7 @@ export function App() {
             status={poll.status}
             reconnecting={poll.reconnecting}
             error={poll.error}
+            provingSince={poll.provingSince}
             recent={recent}
             onRetry={onRetry}
             onReset={onReset}

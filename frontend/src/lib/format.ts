@@ -11,6 +11,18 @@ export function stroopsToXlm(stroops: number): string {
   return (stroops / 1e7).toFixed(7).replace(/\.?0+$/, "");
 }
 
+/**
+ * Elapsed seconds → a compact `mm:ss` clock (`0:07`, `2:14`, `12:30`).
+ * Honest: just the wall-clock time the request has spent proving — never a
+ * fabricated progress percentage. Clamps negatives to 0.
+ */
+export function formatElapsed(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const mm = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${mm}:${ss.toString().padStart(2, "0")}`;
+}
+
 /** Copy text to the clipboard; returns true on success. */
 export async function copyText(text: string): Promise<boolean> {
   try {

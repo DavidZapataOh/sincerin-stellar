@@ -11,6 +11,8 @@ import { AggregationViz } from "../components/AggregationViz";
 import { StatusChip } from "../components/StatusChip";
 import { LivePulse } from "../components/LivePulse";
 import { RecentBatches } from "../components/RecentBatches";
+import { useElapsedSeconds } from "../lib/usePolling";
+import { formatElapsed } from "../lib/format";
 import type {
   ProverPhase,
   RecentBatch,
@@ -25,6 +27,8 @@ interface Props {
   status: StatusResponse | null;
   reconnecting: boolean;
   error: string | null;
+  /** Epoch-ms of the first `proving` observation (drives the elapsed clock). */
+  provingSince: number | null;
   recent: RecentBatch[];
   onRetry: () => void;
   onReset: () => void;
@@ -60,6 +64,7 @@ export function StatusView({
   status,
   reconnecting,
   error,
+  provingSince,
   recent,
   onRetry,
   onReset,
@@ -70,9 +75,17 @@ export function StatusView({
   const idx = phaseIndex(state, phase);
   const isProving = state === "proving";
 
+  // Live elapsed clock while proving — the single biggest "it's moving" signal.
+  // Ticks every second from the first `proving` observation (resets on retry).
+  const elapsed = useElapsedSeconds(isProving ? provingSince : null);
+
   // batch fill
   const filled = status?.batch_size ?? 0;
   const nTarget = status?.n_target ?? config.n_target;
+  // Once a batch is proving, every cell is sealed in — show it FULL, not a
+  // stuck `0/N`. The fill-toward-N belongs to pending/batched; proving's focus
+  // is the elapsed clock + the indeterminate motion below.
+  const fillShown = isProving ? nTarget : Math.min(filled, nTarget);
 
   const hardError = error;
   const failed = state === "failed";
@@ -140,6 +153,10 @@ export function StatusView({
               />
             </div>
 
+            {isProving && (
+              <ProvingMeter elapsed={elapsed} reconnecting={reconnecting} />
+            )}
+
             <ol className="rail" aria-label="Settlement progress">
               {PHASES.map((p, i) => {
                 const done = i < idx;
@@ -166,11 +183,20 @@ export function StatusView({
           </div>
 
           <aside className="status-side">
-            <div className="fillcard">
+            <div className={`fillcard ${isProving ? "is-sealed" : ""}`}>
               <div className="fillcard-head">
                 <span className="fillcard-label">Batch</span>
                 <span className="mono fillcard-count">
-                  {Math.min(filled, nTarget)}/{nTarget}
+                  {isProving ? (
+                    <>
+                      {nTarget}/{nTarget}
+                      <span className="fillcard-sealed"> · proving</span>
+                    </>
+                  ) : (
+                    <>
+                      {fillShown}/{nTarget}
+                    </>
+                  )}
                 </span>
               </div>
               <div
@@ -178,19 +204,24 @@ export function StatusView({
                 role="progressbar"
                 aria-valuemin={0}
                 aria-valuemax={nTarget}
-                aria-valuenow={Math.min(filled, nTarget)}
-                aria-label={`Batch filled to ${Math.min(filled, nTarget)} of ${nTarget} withdrawals`}
+                aria-valuenow={fillShown}
+                aria-label={
+                  isProving
+                    ? `Batch of ${nTarget} sealed and now proving`
+                    : `Batch filled to ${fillShown} of ${nTarget} withdrawals`
+                }
               >
                 {Array.from({ length: nTarget }).map((_, i) => (
                   <span
                     key={i}
-                    className={`fillbar-cell ${i < filled ? "is-filled" : ""}`}
+                    className={`fillbar-cell ${i < fillShown ? "is-filled" : ""}`}
                   />
                 ))}
               </div>
               <p className="fillcard-note">
-                Your withdrawal joins companion notes to complete a batch of{" "}
-                {nTarget}. The {nTarget}→1 aggregation happens with you in it.
+                {isProving
+                  ? `Your batch of ${nTarget} is sealed — the ${nTarget}→1 aggregation is being proved now, with you in it.`
+                  : `Your withdrawal joins companion notes to complete a batch of ${nTarget}. The ${nTarget}→1 aggregation happens with you in it.`}
               </p>
             </div>
 
@@ -199,7 +230,7 @@ export function StatusView({
                 {reconnecting
                   ? "Reconnecting to the sequencer…"
                   : isProving
-                    ? "Proving is real ZK work and takes minutes — this is the proof that it's not faked. You can leave and come back to this request id."
+                    ? "ZK proving typically takes a few minutes — it's safe to leave and come back to this request id. The minutes are the proof it isn't faked."
                     : "Assembling the batch. The request id is yours to poll anytime."}
               </p>
             </div>
@@ -214,6 +245,51 @@ export function StatusView({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * The proving meter — the forward-motion focal point of the minutes-long wait.
+ *
+ *  - A live `mm:ss` elapsed clock (the single biggest "it's moving" signal).
+ *  - An honest INDETERMINATE bar: a monochrome highlight that sweeps across a
+ *    hairline track. It is deliberately NOT a determinate `%` — real ZK proving
+ *    exposes no progress signal, so a fake percentage would be dishonest. The
+ *    `progressbar` role carries no `aria-valuenow` → screen readers announce it
+ *    as indeterminate (truthful), and the elapsed clock is read out via text.
+ *  - `prefers-reduced-motion`: the sweep freezes to a static fill; the clock
+ *    still ticks (it's information, not vestibular motion) and the label reads
+ *    "working…" so reduced-motion users still see the wait is progressing.
+ */
+function ProvingMeter({
+  elapsed,
+  reconnecting,
+}: {
+  elapsed: number;
+  reconnecting: boolean;
+}) {
+  return (
+    <div className="provemeter" aria-live="polite">
+      <div className="provemeter-row">
+        <span className="provemeter-status">
+          <LivePulse tone="proving" label={reconnecting ? "reconnecting" : "proving"} />
+        </span>
+        <span className="provemeter-clock mono" aria-label={`Elapsed ${formatElapsed(elapsed)} (minutes:seconds)`}>
+          {formatElapsed(elapsed)}
+        </span>
+      </div>
+      <div
+        className="provemeter-track"
+        role="progressbar"
+        aria-label="Generating the Groth16 proof — indeterminate, working"
+      >
+        <span className="provemeter-sweep" aria-hidden="true" />
+        <span className="provemeter-still" aria-hidden="true" />
+      </div>
+      <p className="provemeter-hint">
+        ZK proving typically takes a few minutes — safe to leave and come back.
+      </p>
+    </div>
   );
 }
 
