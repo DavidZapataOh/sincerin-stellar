@@ -108,8 +108,8 @@ function Ecosystem() {
 function Showpiece() {
   return (
     <section className="land-showpiece section" aria-labelledby="showpiece-title">
-      <div className="container land-showpiece-head">
-        <Reveal>
+      <div className="container">
+        <Reveal className="land-showpiece-head">
           <p className="land-kicker">The aggregation</p>
           <h2 id="showpiece-title" className="land-showpiece-title">
             Many payments flow in. One settles on Stellar.
