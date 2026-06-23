@@ -90,14 +90,30 @@
   background: var(--ink-invert);
 }
 
+/* ── Inverted-section motif canvas (hero / beat / closing) ──────────────── */
+/* The FlowField sits behind the content, very low contrast; content stays fully
+   legible on its own. aria-hidden, pointer-events none. */
+.flowfield {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+}
+
 /* ── 1 · Hero ───────────────────────────────────────────────────────────── */
 .land-hero {
+  position: relative;
   padding-block: clamp(3.5rem, 2rem + 9vw, 8rem);
   overflow: hidden;
 }
 .land-hero-grid {
+  position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.06fr) minmax(0, 0.94fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.98fr);
   gap: clamp(2rem, 1rem + 4vw, 5rem);
   align-items: center;
 }
@@ -164,7 +180,90 @@
   }
 }
 
-/* ── 2 · Why Sincerin — 3 benefit cards ─────────────────────────────────── */
+/* ── 2 · Ecosystem strip — the "built on" wall ──────────────────────────── */
+.land-eco {
+  padding-block: clamp(2rem, 1.4rem + 2.4vw, 3.5rem);
+  border-bottom: 1px solid var(--line);
+}
+.ecostrip {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2.1fr);
+  gap: clamp(1.5rem, 1rem + 3vw, 4rem);
+  align-items: center;
+}
+.ecostrip-lead {
+  font-family: var(--font-display);
+  font-size: var(--fs-h3);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  max-width: 14ch;
+}
+.ecostrip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0;
+}
+.ecostrip-item {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding-inline: clamp(0.75rem, 0.4rem + 1.2vw, 1.6rem);
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+.ecostrip-item:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+.ecostrip-glyph {
+  display: inline-flex;
+  color: var(--ink);
+  flex: none;
+}
+.ecostrip-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.ecostrip-name {
+  font-weight: 600;
+  font-size: var(--fs-body);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.ecostrip-role {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  white-space: nowrap;
+}
+@media (max-width: 860px) {
+  .ecostrip {
+    grid-template-columns: 1fr;
+    gap: var(--s-3);
+  }
+  .ecostrip-lead {
+    max-width: none;
+  }
+}
+@media (max-width: 560px) {
+  .ecostrip-list {
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--s-3) 0;
+  }
+  .ecostrip-item {
+    padding: 0 0.6rem;
+  }
+  .ecostrip-item:nth-child(odd) {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
+/* ── 3 · Why Sincerin — editorial ledger (not a card grid) ──────────────── */
 .land-why-head {
   max-width: 60ch;
   margin-bottom: var(--s-5);
@@ -172,42 +271,58 @@
 .land-why-head h2 {
   max-width: 18ch;
 }
-.land-why-grid {
+.land-why-ledger {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ink);
+}
+.ledger-row {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0;
-  border: 1px solid var(--ink);
+  grid-template-columns: 2.5rem minmax(0, 1.1fr) minmax(0, 1.4fr);
+  gap: clamp(1rem, 0.5rem + 2vw, 3rem);
+  align-items: baseline;
+  padding-block: clamp(1.5rem, 1.1rem + 1.4vw, 2.4rem);
+  border-bottom: 1px solid var(--line);
 }
-.benefit {
-  padding: clamp(1.5rem, 1.1rem + 1.6vw, 2.5rem);
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
+/* a small filled square marks each benefit — a typographic bullet, not a number
+   (numbering is reserved for the one real sequence, "How it works") */
+.ledger-mark {
+  width: 11px;
+  height: 11px;
+  background: var(--ink);
+  align-self: center;
+  transform: translateY(-0.1em);
 }
-.benefit:last-child {
-  border-right: none;
-}
-.benefit h3 {
-  font-size: var(--fs-h3);
+.ledger-h {
+  font-size: clamp(1.4rem, 1.1rem + 1.4vw, 2.1rem);
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
 }
-.benefit p {
-  font-size: var(--fs-body);
+.ledger-p {
+  font-size: var(--fs-lead);
   color: var(--muted);
-  line-height: 1.6;
+  line-height: 1.55;
+  max-width: 44ch;
 }
-@media (max-width: 820px) {
-  .land-why-grid {
-    grid-template-columns: 1fr;
+.ledger-row {
+  transition: background var(--dur) var(--ease-out-quart);
+}
+.ledger-row:hover {
+  background: var(--surface);
+}
+@media (max-width: 760px) {
+  .ledger-row {
+    grid-template-columns: 1.5rem 1fr;
+    gap: 0.4rem var(--s-2);
   }
-  .benefit {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
+  .ledger-p {
+    grid-column: 2;
+    max-width: none;
   }
-  .benefit:last-child {
-    border-bottom: none;
+  .ledger-mark {
+    transform: translateY(0.4em);
   }
 }
 
@@ -744,9 +859,13 @@
 
 /* ── 9 · Closing (inverted) ─────────────────────────────────────────────── */
 .land-closing {
+  position: relative;
+  overflow: hidden;
   padding-block: clamp(3.5rem, 2rem + 8vw, 7.5rem);
 }
 .land-closing-inner {
+  position: relative;
+  z-index: 1;
   max-width: 56ch;
 }
 .land-closing-title {
@@ -853,5 +972,383 @@
   .appfoot--landing .appfoot-inner {
     grid-template-columns: 1fr;
     gap: var(--s-3);
+  }
+}
+
+/* ============================================================================
+   AggregationFlow — the signature animated centerpiece.
+   Many payment streams → a bundling pinch → 1 proof → 1 settled tx.
+   Strict B&W; the ONE state-green appears only at the settle node + pulse.
+   ========================================================================= */
+.aggflow {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+.aggflow-stream {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.4;
+}
+.invert .aggflow-stream {
+  stroke: var(--line-invert);
+}
+.aggflow-link {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1.4;
+}
+.aggflow-trunk {
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+.invert .aggflow-trunk {
+  stroke: var(--ink-invert);
+}
+.aggflow-tip {
+  fill: var(--ink);
+}
+.invert .aggflow-tip {
+  fill: var(--ink-invert);
+}
+.aggflow-in {
+  fill: var(--bg);
+  stroke: var(--ink);
+  stroke-width: 1.6;
+}
+.invert .aggflow-in {
+  fill: var(--bg-invert);
+  stroke: var(--ink-invert);
+}
+.aggflow-gather-dot {
+  fill: var(--ink);
+}
+.invert .aggflow-gather-dot {
+  fill: var(--ink-invert);
+}
+.aggflow-particle {
+  fill: var(--ink);
+}
+.invert .aggflow-particle {
+  fill: var(--ink-invert);
+}
+.aggflow-particle--out {
+  fill: var(--state-settled-ink);
+}
+.invert .aggflow-particle--out {
+  fill: var(--state-settled);
+}
+.aggflow-proof-shape {
+  fill: var(--bg);
+  stroke: var(--ink);
+  stroke-width: 2.2;
+}
+.invert .aggflow-proof-shape {
+  fill: var(--bg-invert);
+  stroke: var(--ink-invert);
+}
+.aggflow-proof-glyph {
+  font-size: 17px;
+  font-weight: 600;
+  fill: var(--ink);
+  letter-spacing: -0.04em;
+}
+.invert .aggflow-proof-glyph {
+  fill: var(--ink-invert);
+}
+.aggflow-settle-ring {
+  fill: none;
+  stroke: var(--state-settled-ink);
+  stroke-width: 2.4;
+}
+.invert .aggflow-settle-ring {
+  stroke: var(--state-settled);
+}
+.aggflow-settle-check {
+  stroke: var(--state-settled-ink);
+  stroke-width: 2.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.invert .aggflow-settle-check {
+  stroke: var(--state-settled);
+}
+.aggflow-settle-pulse {
+  fill: none;
+  stroke: var(--state-settled);
+  stroke-width: 2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.aggflow-label {
+  font-family: var(--font-text);
+  font-size: 15px;
+  font-weight: 500;
+  fill: var(--muted);
+}
+.invert .aggflow-label {
+  fill: var(--muted-invert);
+}
+.aggflow-label--settle {
+  fill: var(--state-settled-ink);
+}
+.invert .aggflow-label--settle {
+  fill: var(--state-settled);
+}
+
+/* motion: streams draw in on mount, a looping settle pulse */
+@media (prefers-reduced-motion: no-preference) {
+  .aggflow-stream {
+    stroke-dasharray: 7 7;
+    animation: aggflow-dash 1.6s linear infinite;
+  }
+  .aggflow-settle-pulse {
+    animation: aggflow-pulse 2.4s var(--ease-out-expo) infinite;
+  }
+}
+@keyframes aggflow-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+@keyframes aggflow-pulse {
+  0% {
+    transform: scale(0.78);
+    opacity: 0.55;
+  }
+  70% {
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+/* under reduced motion the animateMotion particles still loop in some engines;
+   that's a continuous low-amplitude motion. We keep the diagram fully drawn and
+   static-readable — the labels + nodes carry the whole meaning without motion. */
+@media (prefers-reduced-motion: reduce) {
+  .aggflow-particle,
+  .aggflow-particle--out {
+    display: none;
+  }
+}
+
+/* ── 4 · Signature showpiece ────────────────────────────────────────────── */
+.land-showpiece {
+  overflow: hidden;
+}
+.land-showpiece-head {
+  max-width: 62ch;
+  margin-bottom: clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+}
+.land-showpiece-title {
+  max-width: 20ch;
+}
+.land-showpiece-lead {
+  margin-top: var(--s-3);
+  font-size: var(--fs-lead);
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 56ch;
+}
+.land-showpiece-stage {
+  width: 100%;
+  max-width: var(--container);
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 0.5rem + 3vw, 3rem);
+}
+.land-showpiece-stage .aggflow {
+  max-height: 460px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: clamp(1.5rem, 1rem + 3vw, 3.5rem) clamp(1rem, 0.5rem + 2vw, 2.5rem);
+}
+
+/* ── 5 · Typographic beat (inverted) ────────────────────────────────────── */
+.land-beat {
+  position: relative;
+  overflow: hidden;
+  padding-block: clamp(4rem, 2.5rem + 9vw, 9rem);
+}
+.land-beat-inner {
+  position: relative;
+  z-index: 1;
+}
+.land-beat-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s-4);
+}
+.land-beat-eq {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.1em 0.4em;
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 0.92;
+  letter-spacing: -0.045em;
+  color: var(--ink-invert);
+}
+/* each "N word" stays a single non-wrapping unit; the equation wraps only
+   between the two terms (so "transaction" never orphans onto its own line) */
+.land-beat-term {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.25em;
+  white-space: nowrap;
+}
+.land-beat-num {
+  font-size: clamp(4rem, 2rem + 16vw, 13rem);
+  line-height: 0.82;
+  font-variant-numeric: tabular-nums;
+}
+.land-beat-num--one {
+  color: var(--state-settled);
+}
+.land-beat-word {
+  font-size: clamp(1.5rem, 0.9rem + 3vw, 3.5rem);
+  letter-spacing: -0.03em;
+  color: var(--muted-invert);
+  align-self: flex-end;
+  padding-bottom: 0.18em;
+}
+.land-beat-op {
+  font-size: clamp(2.5rem, 1.2rem + 8vw, 7rem);
+  color: var(--muted-invert);
+  padding-inline: 0.1em;
+}
+.land-beat-sub {
+  font-size: var(--fs-lead);
+  color: var(--muted-invert);
+  line-height: 1.62;
+  max-width: 46ch;
+}
+
+/* ── 8 · Real settle ────────────────────────────────────────────────────── */
+.land-settle-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr);
+  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  align-items: center;
+}
+.land-settle-copy h2 {
+  max-width: 14ch;
+}
+.land-settle-copy .prose {
+  margin-top: var(--s-3);
+}
+@media (max-width: 900px) {
+  .land-settle-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The settle card — one confident object, not a stats dump. */
+.settlecard {
+  display: block;
+  text-decoration: none;
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  padding: clamp(1.5rem, 1.1rem + 1.6vw, 2.4rem);
+  background: var(--bg);
+  transition:
+    transform var(--dur) var(--ease-out-quart),
+    box-shadow var(--dur) var(--ease-out-quart);
+}
+.settlecard:hover {
+  transform: translateY(-3px);
+  box-shadow: 8px 8px 0 var(--ink);
+}
+.settlecard:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.settlecard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding-bottom: var(--s-3);
+  border-bottom: 1px solid var(--line);
+}
+.settlecard-net {
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settlecard-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.3rem 0.6rem;
+  padding-block: clamp(1.25rem, 0.9rem + 1.5vw, 2rem);
+}
+.settlecard-n {
+  font-family: var(--font-data);
+  font-size: clamp(2.25rem, 1.6rem + 2.8vw, 3.5rem);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+.settlecard-n-label {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  align-self: flex-end;
+  padding-bottom: 0.35em;
+}
+.settlecard-arrow {
+  display: inline-flex;
+  align-self: center;
+  color: var(--state-settled-ink);
+  padding-inline: 0.2rem;
+}
+.settlecard-rows {
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+.settlecard-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s-2);
+  padding-block: 0.7rem;
+  border-bottom: 1px solid var(--line);
+}
+.settlecard-row dt {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.settlecard-row dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+  text-align: right;
+}
+.settlecard-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--state-settled-ink);
+  font-weight: 500;
+}
+.settlecard-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: var(--s-3);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+.settlecard:hover .settlecard-cta {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+@media (prefers-reduced-motion: reduce) {
+  .settlecard:hover {
+    transform: none;
   }
 }
