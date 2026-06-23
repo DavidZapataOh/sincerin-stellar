@@ -120,14 +120,15 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 0.98fr);
-  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  /* the cipher field is ambient — give the copy the room it needs to breathe */
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.72fr);
+  gap: clamp(1.5rem, 0.8rem + 2.6vw, 3.5rem);
   align-items: center;
 }
 .land-hero-title {
   font-size: var(--fs-display);
   margin-top: var(--s-3);
-  max-width: 15ch;
+  max-width: 20ch;
 }
 .land-hero-em {
   color: var(--ink-invert);
