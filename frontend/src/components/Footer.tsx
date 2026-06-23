@@ -13,6 +13,9 @@ import { truncateMiddle } from "../lib/format";
 import { Link } from "../lib/router";
 import { EVIDENCE, EXPLORER, txUrl } from "../lib/evidence";
 
+/** Off-site links. `soon` items aren't live yet — shown honestly, not faked. */
+const SOCIAL_X = "https://x.com/sincerinZK";
+
 const TrustStatement = () => (
   <p>
     <strong>Unlinkable, not hidden.</strong> On-chain, the settle breaks the
@@ -31,20 +34,56 @@ export function Footer(props: Props) {
   if (props.surface === "landing") {
     return (
       <footer className="appfoot appfoot--landing">
-        <div className="container appfoot-base appfoot-base--solo">
-          <span className="appfoot-wip">Live on Stellar testnet · open source</span>
-          <nav className="appfoot-links" aria-label="Footer">
-            <a href={EXPLORER.repo} target="_blank" rel="noreferrer noopener">
-              GitHub
-            </a>
-            <a
-              href={txUrl(EVIDENCE.settleTx)}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              See a real settle
-            </a>
+        <div className="container appfoot-top">
+          <div className="appfoot-brand">
+            <Link to="/" className="appfoot-word">
+              Sincerin
+            </Link>
+            <p className="appfoot-tag">
+              The confidential payments rollup on Stellar — many private payments
+              settle for the cost of about one.
+            </p>
+            <span className="appfoot-status">
+              <span className="appfoot-dot" aria-hidden="true" />
+              Live on Stellar testnet
+            </span>
+          </div>
+
+          <nav className="appfoot-cols" aria-label="Footer">
+            <div className="appfoot-nav">
+              <p className="appfoot-nav-head">Product</p>
+              <Link to="/demo">Launch demo</Link>
+              <a href={txUrl(EVIDENCE.settleTx)} target="_blank" rel="noreferrer noopener">
+                See a real settle
+              </a>
+              <a href={EXPLORER.repo} target="_blank" rel="noreferrer noopener">
+                GitHub
+              </a>
+            </div>
+            <div className="appfoot-nav">
+              <p className="appfoot-nav-head">Learn</p>
+              <span className="appfoot-soon">
+                Documentation <em>soon</em>
+              </span>
+              <span className="appfoot-soon">
+                Whitepaper <em>soon</em>
+              </span>
+              <span className="appfoot-soon">
+                Blog <em>soon</em>
+              </span>
+            </div>
+            <div className="appfoot-nav">
+              <p className="appfoot-nav-head">Follow</p>
+              <a href={SOCIAL_X} target="_blank" rel="noreferrer noopener">
+                X / @sincerinZK
+              </a>
+            </div>
           </nav>
+        </div>
+
+        <div className="container appfoot-base">
+          <span className="appfoot-wip">WIP · not audited · testnet only · open source</span>
+          <span className="appfoot-copy">© 2026 Sincerin</span>
         </div>
       </footer>
     );

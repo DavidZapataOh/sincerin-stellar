@@ -1307,6 +1307,93 @@
   }
 }
 
+/* ── Landing footer — brand block + link columns ────────────────────────── */
+.appfoot--landing {
+  padding-block: var(--s-6) var(--s-4);
+}
+.appfoot-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.5fr);
+  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  align-items: start;
+}
+.appfoot-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--s-2);
+}
+.appfoot-word {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  text-decoration: none;
+}
+.appfoot-tag {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 38ch;
+}
+.appfoot-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.appfoot-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--state-settled);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--state-settled) 22%, transparent);
+}
+.appfoot-cols {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(1.25rem, 0.8rem + 1.6vw, 2.5rem);
+}
+/* not-yet-live links: shown honestly as muted, non-interactive, tagged "soon" */
+.appfoot-soon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--muted);
+  cursor: default;
+}
+.appfoot-soon em {
+  font-family: var(--font-data);
+  font-style: normal;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 0.08em 0.4em;
+  border-radius: 999px;
+}
+.appfoot-copy {
+  font-family: var(--font-data);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+@media (max-width: 820px) {
+  .appfoot-top {
+    grid-template-columns: 1fr;
+    gap: var(--s-4);
+  }
+}
+@media (max-width: 480px) {
+  .appfoot-cols {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--s-3);
+  }
+}
+
 /* ============================================================================
    AggregationFlow — the signature animated centerpiece.
    Many payment streams → a bundling pinch → 1 proof → 1 settled tx.

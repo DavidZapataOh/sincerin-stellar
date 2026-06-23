@@ -245,8 +245,8 @@ function Closing() {
   return (
     <section className="land-closing invert" aria-labelledby="closing-title">
       <FlowField density={0.7} />
-      <div className="container land-closing-inner">
-        <Reveal>
+      <div className="container">
+        <Reveal className="land-closing-inner">
           <h2 id="closing-title" className="land-closing-title">
             See it settle. Right now.
           </h2>
