@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # gpu_latency_check_n8.sh — PARADA 1 (s3/05 paso 1): cronometrar un prove REAL de
-# N=8 (guest desplegado, depth 3, image_id cbeab7aa…) en una caja GPU x86 nativa.
+# N=8 (guest depth 3, 122,683,392 cycles) en una caja GPU x86 nativa.
 #
 # Objetivo: medir el wall-clock real del wrap STARK→Groth16 en x86 NATIVO + CUDA
 # (sin emulación ARM, con RAM suficiente) para decidir si N_target=8 se mantiene
@@ -10,17 +10,19 @@
 # CERO MOCKS: RISC0_DEV_MODE=0 forzado; se rechaza un seal dev-mode (ffffffff).
 #
 # Requisitos de la instancia (CONFIRMADOS): x86_64 · NVIDIA con nvcc (CUDA *devel*,
-# no solo runtime) · **Docker funcionando** (nuestro pipeline lo usa para el build
-# reproducible del guest y para el wrap Groth16) · ≥32 GiB RAM · ≥60 GiB disco.
-# → Por el Docker, una VM GPU (Lambda Cloud / AWS g6 Deep Learning AMI) es lo seguro;
-#   un pod-contenedor de RunPod NO trae daemon Docker y revienta en el build.
+# no solo runtime) · ≥32 GiB RAM · ≥50 GiB disco. **NO se necesita Docker daemon.**
+# Verificado en risc0 v3.0.5 (groth16/src/prove/mod.rs): con la feature `cuda` el wrap
+# Groth16 corre NATIVO (risc0-groth16/cuda → rapidsnark FFI, cero Docker). El guest se
+# construye en LOCAL con ROLLUP_LOCAL_GUEST=1 (image_id distinto, pero cycles y tiempo
+# de prove IDÉNTICOS). → Sirve una caja CUDA simple: **RunPod CUDA *devel***, Vast.ai,
+# o Lambda. Este ES el camino del worker serverless de producción: host prove nativo.
 #
 # Cómo correrlo:
 #   curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/main/scripts/gpu_latency_check_n8.sh | bash
 # El script clona el repo público, instala lo que falte, habilita la feature cuda,
-# construye y cronometra el prove. La PRIMERA build (kernels CUDA + guest en Docker
-# + pull de contenedores) tarda ~15–40 min ANTES del prove; eso NO se cronometra.
-# Solo se mide el `host prove`. Pega TODA la salida (sobre todo el bloque RESULT).
+# construye el guest en LOCAL (sin Docker) y cronometra el prove NATIVO. La primera
+# build (kernels CUDA + guest local + params groth16) tarda ~10–25 min ANTES del prove;
+# eso NO se cronometra. Solo se mide el `host prove`. Pega TODA la salida (bloque RESULT).
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -34,23 +36,20 @@ EXPECTED_CYCLES="122683392"   # executor padded cycles para N=8 (sanity)
 log(){ printf '\n\033[1m== %s ==\033[0m\n' "$*"; }
 die(){ printf '\n\033[31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 
-# 0) Sanity: arch x86 + GPU NVIDIA + Docker + RAM ────────────────────────────
+# 0) Sanity: arch x86 + GPU NVIDIA + RAM + disco (SIN Docker) ─────────────────
 log "0) Sanity del entorno"
 ARCH="$(uname -m)"; echo "arch: $ARCH"
 [ "$ARCH" = "x86_64" ] || die "No es x86_64 ($ARCH). El Groth16 prover SOLO corre en x86. Usa una caja GPU x86."
 command -v nvidia-smi >/dev/null 2>&1 || die "nvidia-smi ausente — sin GPU/driver NVIDIA. Instala el driver o elige una instancia GPU."
 nvidia-smi --query-gpu=name,memory.total,driver_version --format=csv,noheader || die "nvidia-smi falló"
-command -v docker >/dev/null 2>&1 || die "docker no instalado."
-docker info >/dev/null 2>&1 || die "daemon de docker apagado (sudo systemctl start docker; añade tu user al grupo docker)."
 RAM_GB="$(free -g | awk '/Mem:/{print $2}')"; echo "RAM de sistema (GiB): $RAM_GB"
 [ "${RAM_GB:-0}" -ge 24 ] || echo "AVISO: <24 GiB de RAM; el wrap Groth16 topó a 7.65 GiB en Mac — vigila OOM."
-# Disco: risc0 toolchain + imágenes Docker (guest build + groth16 wrap) + build release
-# + kernels CUDA pesan. Abortar ANTES de pagar el setup si no hay espacio.
+# Disco: risc0 toolchain + cargo target + kernels CUDA + params groth16 pesan.
+# Abortar ANTES de pagar el setup si no hay espacio. (Sin Docker → menos peso.)
 free_gb(){ df -BG "$1" 2>/dev/null | awk 'NR==2{gsub(/G/,"",$4); print $4+0}'; }
-HOME_FREE="$(free_gb "$(dirname "$WORKDIR")")"; VAR_FREE="$(free_gb /var/lib 2>/dev/null || free_gb /var)"
-echo "disco libre — work($(dirname "$WORKDIR")): ${HOME_FREE:-?}G  /var(docker): ${VAR_FREE:-?}G"
-[ "${HOME_FREE:-0}" -ge 50 ] || die "Menos de 50 GiB libres en el disco de trabajo (${HOME_FREE}G). risc0 + Docker + build release no caben. Levanta la instancia con ≥60 GiB y re-corre."
-[ "${VAR_FREE:-0}" -ge 20 ] || echo "AVISO: /var con <20 GiB (las imágenes Docker viven ahí — guest build + groth16 prover). Vigila ENOSPC en el build."
+HOME_FREE="$(free_gb "$(dirname "$WORKDIR")")"
+echo "disco libre — work($(dirname "$WORKDIR")): ${HOME_FREE:-?}G"
+[ "${HOME_FREE:-0}" -ge 50 ] || die "Menos de 50 GiB libres en el disco de trabajo (${HOME_FREE}G). risc0 toolchain + build release + kernels CUDA no caben. Levanta la instancia con ≥50 GiB y re-corre."
 
 # 1) Deps de build (apt, best-effort) ────────────────────────────────────────
 log "1) Deps de sistema (build-essential, libssl-dev, …)"
@@ -77,14 +76,15 @@ fi
 . "$HOME/.cargo/env" 2>/dev/null || true
 cargo --version || die "cargo no disponible tras instalar rustup."
 
-# 4) RISC Zero toolchain (rzup) — match exacto del crate risc0-zkvm =3.0.5 ────
-log "4) RISC Zero toolchain (rzup → cargo-risczero/r0vm $R0_VERSION)"
+# 4) RISC Zero toolchain (rzup) — incluye el toolchain 'rust' para el guest LOCAL ─
+log "4) RISC Zero toolchain (rzup → cargo-risczero/r0vm/rust $R0_VERSION)"
 if ! command -v rzup >/dev/null 2>&1; then
   curl -L https://risczero.com/install | bash || true
 fi
 export PATH="$HOME/.risc0/bin:$PATH"
-rzup install cargo-risczero "$R0_VERSION" || echo "AVISO: rzup cargo-risczero falló (belt-and-suspenders; el guest se construye en Docker)."
-rzup install r0vm "$R0_VERSION" || echo "AVISO: rzup r0vm falló (belt-and-suspenders)."
+rzup install cargo-risczero "$R0_VERSION" || die "rzup cargo-risczero falló — necesario para el guest build local."
+rzup install r0vm "$R0_VERSION" || die "rzup r0vm falló — necesario para proving."
+rzup install rust || die "rzup rust falló — el toolchain risc0 'rust' construye el guest en LOCAL (ROLLUP_LOCAL_GUEST=1, sin Docker)."
 
 # 5) Clonar el repo público (workspace en la raíz) ───────────────────────────
 log "5) Clonar repo"
@@ -101,8 +101,12 @@ fi
 grep -n 'risc0-zkvm' host/Cargo.toml | head -1
 grep -q 'features = \["cuda"\]' host/Cargo.toml || die "no pude habilitar la feature cuda en host/Cargo.toml (revisa el formato de la línea)."
 
-# 7) Build host (kernels CUDA + guest reproducible en Docker) — NO cronometrado
-log "7) cargo build --release -p host (primera build LENTA; pulls + kernels + guest Docker)"
+# 7) Build host (kernels CUDA + guest LOCAL sin Docker) — NO cronometrado ─────
+# ROLLUP_LOCAL_GUEST=1 → methods/build.rs compila el guest en el toolchain local
+# (sin Docker). image_id distinto al cbeab7aa desplegado, pero cycles y tiempo de
+# prove IDÉNTICOS (misma lógica). El wrap Groth16 va por risc0-groth16/cuda = nativo.
+log "7) cargo build --release -p host (primera build LENTA; kernels CUDA + guest local)"
+export ROLLUP_LOCAL_GUEST=1
 RISC0_DEV_MODE=0 cargo build --release -p host
 
 # 8) Sanity del executor (rápido, sin proving): cycles == canónico N=8 ────────
@@ -135,6 +139,7 @@ printf 'N=8 prove wall-clock: %dm %ds   (%d segundos)\n' $((ELAPSED/60)) $((ELAP
 [ -n "$MAXRSS_KB" ] && printf 'pico de RAM (RSS):    %d MiB\n' $((MAXRSS_KB/1024))
 printf 'seal selector:        %s   (≠ ffffffff ✓ prueba real)\n' "$SEAL_HEAD"
 printf 'image_id:             %s\n' "$(cat "$OUTDIR/image_id.hex" 2>/dev/null)"
+printf 'prove path:           CUDA NATIVO (risc0-groth16/cuda, sin Docker) = camino de producción\n'
 echo
 if   [ "$ELAPSED" -le 600 ];  then echo "VEREDICTO: ≲10min → N_target=8 SE MANTIENE ✅";
 elif [ "$ELAPSED" -le 1800 ]; then echo "VEREDICTO: ~10–30min → AVISAR a David: reconsiderar N_target default ⚠️";

@@ -38,10 +38,29 @@ fn main() {
     // bit-for-bit the binary the on-chain `settle_batch` contract binds. NOTHING
     // here (and no env var) changes this guest — its depth is hardcoded `3` in
     // methods/guest/src/main.rs. This is the guest the N=8 testnet demo settles.
-    let deployed_options = GuestOptionsBuilder::default()
-        .use_docker(mk_docker())
-        .build()
-        .expect("GuestOptions(deployed)");
+    // ── Latency-harness ONLY: `ROLLUP_LOCAL_GUEST=1` builds the guests on the
+    // LOCAL risc0 toolchain (NO Docker), so PARADA 1 runs on a plain CUDA box with
+    // no Docker daemon. It yields a DIFFERENT, path-dependent image_id (NOT the
+    // deployed cbeab7aa…) but BYTE-IDENTICAL guest logic → identical cycle count
+    // and prove time. NEVER set this for a deployed/settle build: default (unset)
+    // keeps the reproducible Docker build and the on-chain-bound image_id. The
+    // native CUDA Groth16 wrap is the SAME either way (it depends on the `cuda`
+    // cargo feature of risc0-groth16, NOT on how the guest ELF was built).
+    println!("cargo:rerun-if-env-changed=ROLLUP_LOCAL_GUEST");
+    let local_guest = std::env::var("ROLLUP_LOCAL_GUEST")
+        .ok()
+        .is_some_and(|v| !v.is_empty() && v != "0");
+
+    let deployed_options = if local_guest {
+        GuestOptionsBuilder::default()
+            .build()
+            .expect("GuestOptions(deployed, local)")
+    } else {
+        GuestOptionsBuilder::default()
+            .use_docker(mk_docker())
+            .build()
+            .expect("GuestOptions(deployed)")
+    };
 
     // ── PROVING-ONLY bench guest (`rollup-guest-bench`, depth 3/4/5). ──────────
     // NEVER deployed/settled — its image_id is allowed to differ per depth. We
@@ -63,11 +82,18 @@ fn main() {
              (only 3 [default], 4 [N=16 proving-only], 5 [N=32 proving-only])"
         ),
     };
-    let bench_options = GuestOptionsBuilder::default()
-        .use_docker(mk_docker())
-        .features(bench_features)
-        .build()
-        .expect("GuestOptions(bench)");
+    let bench_options = if local_guest {
+        GuestOptionsBuilder::default()
+            .features(bench_features)
+            .build()
+            .expect("GuestOptions(bench, local)")
+    } else {
+        GuestOptionsBuilder::default()
+            .use_docker(mk_docker())
+            .features(bench_features)
+            .build()
+            .expect("GuestOptions(bench)")
+    };
 
     let mut options = HashMap::new();
     options.insert("rollup-guest", deployed_options);
