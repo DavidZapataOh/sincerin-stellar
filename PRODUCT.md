@@ -10,7 +10,7 @@ brand
 
 ## Product Purpose
 
-UI de demo del **Confidential Payments Rollup on Stellar**: una privacy-pool rollup que **agrega N retiradas privadas off-chain en 1 receipt RISC Zero (Groth16/BN254)** verificado **on-chain en Soroban**. "Confidential" = **contrapartes unlinkables** (se rompe depósito↔retiro); **montos en claro**. La UI existe para que un juez **constate en vivo que el rollup funciona de verdad** y pueda correrlo él mismo. Éxito = el juez concluye **"esto es infraestructura REAL, no un mock"** y, con solo el link, hace un retiro end-to-end.
+**Sincerin es el Confidential Payments ROLLUP on Stellar** — la capa de **agregación** que toma N pagos privados (retiradas de un pool de pagos privados base) y los **agrega off-chain en 1 prueba RISC Zero (Groth16/BN254)** verificada **una sola vez on-chain en Soroban** → **N pagos privados liquidan al costo de ~uno**. ⚠️ **Sincerin NO es la privacy pool**: la pool base (`stellar-private-payments` de Nethermind) es el **sustrato** clonado; **Sincerin es el rollup/agregación ENCIMA** — el aporte real (guest RISC Zero + `settle_batch` + benchmark). "Confidential" = **contrapartes unlinkables** (se rompe depósito↔retiro); **montos en claro**. La landing vende **la agregación/escala** (muchos pagos privados → 1 transacción) a quien usaría Sincerin; el demo (UI funcional) prueba que el rollup corre de verdad on-chain.
 
 ## Brand Personality
 

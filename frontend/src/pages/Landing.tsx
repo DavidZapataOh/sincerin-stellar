@@ -38,15 +38,15 @@ function Hero() {
     <section className="land-hero invert" aria-labelledby="land-hero-title">
       <div className="container land-hero-grid">
         <div className="land-hero-copy">
-          <LivePulse tone="settled" label="Live on Stellar testnet" />
+          <LivePulse tone="settled" label="Confidential payments rollup · Stellar testnet" />
           <h1 id="land-hero-title" className="land-hero-title">
-            The money moves.{" "}
-            <span className="land-hero-em">The trail doesn&apos;t.</span>
+            Many private payments.{" "}
+            <span className="land-hero-em">One transaction.</span>
           </h1>
           <p className="land-hero-lead">
-            Sincerin is a privacy pool on Stellar. Deposit, then withdraw to any
-            address — with no link back to you. Private payments, cheap enough to
-            actually use.
+            Sincerin is a confidential payments rollup on Stellar. It bundles
+            private payments into a single proof and settles them all at once —
+            so paying privately finally scales.
           </p>
           <div className="land-hero-cta">
             <Link to="/demo" className="btn btn--primary-invert btn--lg">
@@ -78,28 +78,28 @@ function Why() {
     <section className="container section land-why" aria-labelledby="why-title">
       <Reveal className="land-why-head">
         <p className="land-kicker">Why Sincerin</p>
-        <h2 id="why-title">Private payments that hold up.</h2>
+        <h2 id="why-title">Private payments that actually scale.</h2>
       </Reveal>
 
       <div className="land-why-grid">
         <Reveal className="benefit" delay={60}>
-          <h3>Unlinkable by design</h3>
+          <h3>Many payments, one transaction</h3>
           <p>
-            Your deposit and your withdrawal can&apos;t be connected. Pay anyone
-            without it pointing back to you.
+            Sincerin settles a whole batch of private payments together on
+            Stellar — dozens at the cost of one.
           </p>
         </Reveal>
         <Reveal className="benefit" delay={120}>
-          <h3>Cheap at scale</h3>
+          <h3>Unlinkable</h3>
           <p>
-            Many withdrawals settle together in one Stellar transaction — so
-            staying private costs cents, not a premium.
+            Senders and recipients can&apos;t be tied together. Who paid whom
+            stays private.
           </p>
         </Reveal>
         <Reveal className="benefit" delay={180}>
-          <h3>Settled on Stellar</h3>
+          <h3>Real, final, on Stellar</h3>
           <p>
-            Real, final settlement on Stellar. No bridges, no wrapped tokens, no
+            Settled directly on Stellar — no bridges, no wrapped tokens, no
             middlemen.
           </p>
         </Reveal>
@@ -111,21 +111,21 @@ function Why() {
 /* ── 3 · How it works (3 plain steps) ───────────────────────────────────── */
 function HowItWorks() {
   const steps = [
-    { title: "Deposit", text: "Put funds into the shared pool." },
+    { title: "Queue payments", text: "Line up the private payments you want to make." },
     {
-      title: "Withdraw privately",
-      text: "Request a withdrawal to any address you choose.",
+      title: "Prove them once",
+      text: "Sincerin bundles the whole batch into a single proof.",
     },
     {
-      title: "Settled, unlinkable",
-      text: "It lands on Stellar — with no trail back to your deposit.",
+      title: "Settle together",
+      text: "They all land on Stellar in one transaction — unlinkable.",
     },
   ];
   return (
     <section className="container section land-steps" aria-labelledby="steps-title">
       <Reveal className="land-steps-head">
         <p className="land-kicker">How it works</p>
-        <h2 id="steps-title">Three steps. No trail.</h2>
+        <h2 id="steps-title">Many payments in. One transaction out.</h2>
       </Reveal>
 
       <ol className="land-steps-grid">
@@ -148,16 +148,16 @@ function Scales() {
   return (
     <section className="container section land-scales" aria-labelledby="scales-title">
       <Reveal className="land-scales-copy">
-        <p className="land-kicker">At scale</p>
-        <h2 id="scales-title">Privacy that scales.</h2>
+        <p className="land-kicker">One proof for the batch</p>
+        <h2 id="scales-title">Why it stays cheap.</h2>
         <p className="prose">
-          Sincerin bundles many withdrawals together and settles them in a single
-          transaction. That&apos;s how it stays fast and cheap — even as more
-          people use it.
+          Paying privately on-chain is expensive one payment at a time. Sincerin
+          proves a whole batch at once and verifies it a single time — so each
+          payment costs a fraction, and private payments work at real volume.
         </p>
         <p className="land-scales-honest">
-          Amounts settle in the open on Stellar — what disappears is the link
-          between you and your payment.
+          Amounts settle in the open on Stellar — what stays private is who paid
+          whom.
         </p>
       </Reveal>
 
