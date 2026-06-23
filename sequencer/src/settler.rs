@@ -27,6 +27,16 @@ pub enum SettleError {
     Invoke(String),
     /// The invoke ran but no 64-hex transaction hash was found in its output.
     NoTxHash(String),
+    /// The invoke produced a tx hash, but the on-chain transaction did NOT apply
+    /// successfully (RPC `getTransaction` returned a status other than `SUCCESS`).
+    /// Carries the real (resolvable) hash and the observed status — the funds did
+    /// not move, so this must NEVER be reported as settled.
+    OnchainFailed {
+        /// The real (resolvable) settle tx hash that did not apply successfully.
+        hash: String,
+        /// The observed on-chain status (e.g. `FAILED`, `NOT_FOUND`).
+        status: String,
+    },
 }
 
 impl core::fmt::Display for SettleError {
@@ -34,6 +44,9 @@ impl core::fmt::Display for SettleError {
         match self {
             SettleError::Invoke(s) => write!(f, "settle invoke: {s}"),
             SettleError::NoTxHash(s) => write!(f, "settle produced no tx hash: {s}"),
+            SettleError::OnchainFailed { hash, status } => {
+                write!(f, "settle tx {hash} did not succeed on-chain (status {status})")
+            }
         }
     }
 }
@@ -128,6 +141,54 @@ pub fn parse_tx_hash(output: &str, exclude: &str) -> Option<String> {
         }
     }
     None
+}
+
+/// Decide the settle tx hash from a raw `stellar` invoke result. PURE.
+///
+/// EJE-1 gate: a NON-success exit (`ok == false`) NEVER yields a hash. A failed
+/// invoke's diagnostics can carry OTHER 64-hex values (notably the contract-
+/// computed `sha256(journal_bytes)` digest) that would 404 on the explorer if
+/// mis-reported as a settle tx — so success is required BEFORE parsing. On
+/// success, the image_id (echoed as `--image_id`, also 64 hex) is excluded so the
+/// real tx hash is returned.
+pub fn parse_settle_output(
+    ok: bool,
+    combined: &str,
+    image_id_hex: &str,
+) -> Result<String, SettleError> {
+    if !ok {
+        return Err(SettleError::Invoke(format!(
+            "stellar invoke exited non-zero: {}",
+            combined.trim()
+        )));
+    }
+    match parse_tx_hash(combined, image_id_hex) {
+        Some(h) => Ok(h),
+        None => Err(SettleError::NoTxHash(combined.trim().to_string())),
+    }
+}
+
+/// Read `.result.status` out of an RPC `getTransaction` JSON response. PURE.
+/// Returns `None` if the body isn't JSON or has no `result.status` string (e.g. an
+/// RPC-level `error`) — the caller treats that as "not confirmed".
+pub fn parse_rpc_status(json: &str) -> Option<String> {
+    let v: serde_json::Value = serde_json::from_str(json).ok()?;
+    v.get("result")?
+        .get("status")?
+        .as_str()
+        .map(|s| s.to_string())
+}
+
+/// Map an on-chain `getTransaction` status to the final settle result. PURE.
+///
+/// EJE-3 invariant: ONLY `SUCCESS` yields a settled tx hash. Any other status
+/// (`FAILED`, `NOT_FOUND`, `PENDING`, `UNKNOWN`, …) is an error → the driver marks
+/// the batch `Failed`, releases the lock, and the note can be re-submitted. The
+/// funds path is never reported settled on a tx that didn't actually apply.
+pub fn finalize_status(hash: String, _status: &str) -> Result<String, SettleError> {
+    // STUB (TDD red): unconditionally Ok — the FAILED / NOT_FOUND tests must fail
+    // against this until the real check is implemented.
+    Ok(hash)
 }
 
 /// Production settler: shells out to the real `stellar contract invoke … settle_batch`
@@ -299,5 +360,93 @@ mod tests {
         let mixed = format!("seal={} tx=", long_hex);
         let with_hash = format!("{}{}", mixed, "b".repeat(64));
         assert_eq!(parse_tx_hash(&with_hash, ""), Some("b".repeat(64)));
+    }
+
+    // ── EJE 1 · the success gate is testable as a pure function ─────────────
+    #[test]
+    fn parse_settle_output_rejects_spurious_hex_on_failure() {
+        // A FAILED invoke whose diagnostics carry a 64-hex value (e.g. the
+        // contract-computed journal digest) must NEVER yield a hash — it's Invoke,
+        // never NoTxHash-with-a-digest, never Ok. (This is exactly Bug B's class.)
+        let digest = "b".repeat(64);
+        let out = format!("error: HostError … sha256(journal_bytes)={digest}\n");
+        match parse_settle_output(false, &out, "") {
+            Err(SettleError::Invoke(_)) => {}
+            other => panic!("non-success must be Invoke err, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_settle_output_returns_tx_hash_excluding_image_id() {
+        let image_id = "c".repeat(64);
+        let tx = "a".repeat(64);
+        let out = format!("… --image_id {image_id} …\nSubmitting\n{tx}\n✅ succeeded\n");
+        assert_eq!(parse_settle_output(true, &out, &image_id).unwrap(), tx);
+    }
+
+    #[test]
+    fn parse_settle_output_no_hash_is_error() {
+        assert!(matches!(
+            parse_settle_output(true, "no hash here, just words", ""),
+            Err(SettleError::NoTxHash(_))
+        ));
+    }
+
+    // ── EJE 3 · only an on-chain SUCCESS may be reported settled ────────────
+    #[test]
+    fn finalize_status_success_yields_hash() {
+        assert_eq!(
+            finalize_status("deadhash".into(), "SUCCESS").unwrap(),
+            "deadhash"
+        );
+    }
+
+    #[test]
+    fn finalize_status_failed_is_error_not_settled() {
+        // A tx that did NOT apply on-chain must surface as OnchainFailed (→ Failed,
+        // lock released, re-submit possible) — NEVER as a settled hash.
+        match finalize_status("deadhash".into(), "FAILED") {
+            Err(SettleError::OnchainFailed { hash, status }) => {
+                assert_eq!(hash, "deadhash");
+                assert_eq!(status, "FAILED");
+            }
+            other => panic!("FAILED must be OnchainFailed err, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn finalize_status_not_found_is_error() {
+        assert!(matches!(
+            finalize_status("h".into(), "NOT_FOUND"),
+            Err(SettleError::OnchainFailed { .. })
+        ));
+    }
+
+    #[test]
+    fn finalize_status_unknown_is_error() {
+        assert!(matches!(
+            finalize_status("h".into(), "UNKNOWN"),
+            Err(SettleError::OnchainFailed { .. })
+        ));
+    }
+
+    #[test]
+    fn parse_rpc_status_reads_result_status() {
+        let ok = r#"{"jsonrpc":"2.0","id":1,"result":{"status":"SUCCESS","latestLedger":9}}"#;
+        assert_eq!(parse_rpc_status(ok).as_deref(), Some("SUCCESS"));
+        assert_eq!(
+            parse_rpc_status(r#"{"result":{"status":"FAILED"}}"#).as_deref(),
+            Some("FAILED")
+        );
+        assert_eq!(
+            parse_rpc_status(r#"{"result":{"status":"NOT_FOUND"}}"#).as_deref(),
+            Some("NOT_FOUND")
+        );
+    }
+
+    #[test]
+    fn parse_rpc_status_none_on_malformed_or_error() {
+        assert_eq!(parse_rpc_status("not json at all"), None);
+        assert_eq!(parse_rpc_status(r#"{"error":{"code":-32602}}"#), None);
     }
 }
