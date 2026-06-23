@@ -20,7 +20,9 @@
 # Cómo correrlo:
 #   curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/main/scripts/gpu_latency_check_n8.sh | bash
 # El script clona el repo público, instala lo que falte, habilita la feature cuda,
-# construye el guest en LOCAL (sin Docker) y cronometra el prove NATIVO. La primera
+# FIJA sppark=0.1.12 (la versión que risc0 3.0.5 testeó; 0.1.15 da illegal memory
+# access en runtime), construye el guest en LOCAL (sin Docker) y cronometra el prove
+# NATIVO. La primera
 # build (kernels CUDA + guest local + params groth16) tarda ~10–25 min ANTES del prove;
 # eso NO se cronometra. Solo se mide el `host prove`. Pega TODA la salida (bloque RESULT).
 # ─────────────────────────────────────────────────────────────────────────────
@@ -100,6 +102,19 @@ if ! grep -q 'features = \["cuda"\]' host/Cargo.toml; then
 fi
 grep -n 'risc0-zkvm' host/Cargo.toml | head -1
 grep -q 'features = \["cuda"\]' host/Cargo.toml || die "no pude habilitar la feature cuda en host/Cargo.toml (revisa el formato de la línea)."
+
+# 6b) Fijar la pila CUDA a las versiones que risc0 3.0.5 TESTEÓ (su Cargo.lock). ─
+# Nuestro lock no fija los deps cuda (opcionales) → la resolución fresca trae
+# sppark 0.1.15, pero risc0 3.0.5 fue compilado/testeado con sppark 0.1.12. El
+# drift (45+ commits de cambios internos de sppark que los kernels de risc0 3.0.5
+# NO esperan) revienta en runtime con "illegal memory access" en sppark/gpu_t.cuh.
+# CONFIRMADO: risc0 v3.0.5 Cargo.lock = sppark 0.1.12, cust 0.3.2, blst 0.3.15.
+log "6b) Fijar sppark=0.1.12 (risc0 3.0.5 testeada; 0.1.15 → illegal memory access)"
+cargo fetch >/dev/null 2>&1 || true        # resuelve la feature cuda → sppark entra al lock
+cargo update -p sppark --precise 0.1.12 2>&1 | tail -3 || die "no pude fijar sppark 0.1.12 — pega el error."
+grep -A1 'name = "sppark"' Cargo.lock | grep -q '"0.1.12"' || die "sppark no quedó en 0.1.12 en el lock."
+cargo update -p blst --precise 0.3.15 2>&1 | tail -2 || echo "AVISO: no pude fijar blst 0.3.15 (insurance; el crash es sppark, no crítico)."
+echo "pila cuda fijada:"; for c in sppark cust blst; do printf '  %-8s' "$c"; grep -A1 "name = \"$c\"" Cargo.lock | grep version | head -1 | tr -d ' '; done
 
 # 7) Build host (kernels CUDA + guest LOCAL sin Docker) — NO cronometrado ─────
 # ROLLUP_LOCAL_GUEST=1 → methods/build.rs compila el guest en el toolchain local
