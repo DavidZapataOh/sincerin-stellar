@@ -1,0 +1,276 @@
+//! The on-chain settle seam (s3/02) — the ONLY frontier between the sequencer and
+//! the deployed rollup contract.
+//!
+//! The sequencer hands a proven batch to a [`Settler`], which sends the REAL
+//! on-chain `settle_batch` and returns the settle transaction hash. Local vs the
+//! deployed contract is pure config; the state machine never changes.
+//!
+//! - [`StellarCliSettler`] (production, the REAL settle): shells out to
+//!   `stellar contract invoke … settle_batch --seal {hex} --image_id {hex}
+//!   --journal_bytes {hex}` — byte-for-byte the same invoke `scripts/seq_demo.sh`
+//!   runs — and parses the 64-hex tx hash from the output. There is NO mock settle
+//!   in the product path.
+//!
+//! The exact `stellar` argv it constructs and the tx-hash parser are split out as
+//! PURE functions ([`settle_argv`], [`parse_tx_hash`]) so they are unit-tested
+//! without spawning a process or touching the chain.
+
+use async_trait::async_trait;
+
+use crate::types::ProvedBatch;
+
+/// Errors the settle step can surface. The driver maps these to a `Failed` status
+/// (the note's reservation is released, so the user can re-submit).
+#[derive(Debug)]
+pub enum SettleError {
+    /// The `stellar` process could not be spawned or exited non-zero.
+    Invoke(String),
+    /// The invoke ran but no 64-hex transaction hash was found in its output.
+    NoTxHash(String),
+}
+
+impl core::fmt::Display for SettleError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            SettleError::Invoke(s) => write!(f, "settle invoke: {s}"),
+            SettleError::NoTxHash(s) => write!(f, "settle produced no tx hash: {s}"),
+        }
+    }
+}
+
+impl std::error::Error for SettleError {}
+
+/// The on-chain settle interface. `settle` sends the REAL `settle_batch` and
+/// returns the settle tx hash (hex). The sequencer always calls it off the submit
+/// path (the background pipeline), so the user never blocks.
+#[async_trait]
+pub trait Settler: Send + Sync {
+    /// Send `proved` on-chain via `settle_batch` and return the tx hash (hex).
+    /// Implementations MUST perform a real on-chain settle (no fabricated hash) on
+    /// the product path.
+    async fn settle(&self, proved: &ProvedBatch) -> Result<String, SettleError>;
+
+    /// A short label for logging/telemetry (e.g. "stellar-cli(testnet)").
+    fn backend_label(&self) -> String;
+}
+
+/// Build the exact `stellar` argv for a `settle_batch` invoke against `rollup_id`,
+/// signed by `source`, on `network`. Mirrors `scripts/seq_demo.sh` byte-for-byte:
+///
+/// ```text
+/// stellar contract invoke --id <rollup_id> --source <source> --network <network> \
+///   --send=yes -- settle_batch --seal <hex> --image_id <hex> --journal_bytes <hex>
+/// ```
+///
+/// The seal/image_id/journal are hex-encoded (no `0x` prefix — the same form the
+/// script passes). Returns the argv WITHOUT the leading `stellar` program name
+/// (the caller spawns `Command::new("stellar")`).
+pub fn settle_argv(
+    rollup_id: &str,
+    source: &str,
+    network: &str,
+    proved: &ProvedBatch,
+) -> Vec<String> {
+    let seal_hex = hex::encode(&proved.seal);
+    let image_id_hex = hex::encode(proved.image_id);
+    let journal_hex = hex::encode(&proved.journal);
+    vec![
+        "contract".into(),
+        "invoke".into(),
+        "--id".into(),
+        rollup_id.into(),
+        "--source".into(),
+        source.into(),
+        "--network".into(),
+        network.into(),
+        "--send=yes".into(),
+        "--".into(),
+        "settle_batch".into(),
+        "--seal".into(),
+        seal_hex,
+        "--image_id".into(),
+        image_id_hex,
+        "--journal_bytes".into(),
+        journal_hex,
+    ]
+}
+
+/// Parse the FIRST 64-hex transaction hash out of `stellar`'s combined output
+/// (stdout+stderr). Mirrors the gate's `grep -oE '[a-f0-9]{64}' | head -1`.
+///
+/// Returns `None` if no 64-char run of lowercase-hex is present.
+pub fn parse_tx_hash(output: &str) -> Option<String> {
+    let bytes = output.as_bytes();
+    let is_hex = |b: u8| b.is_ascii_digit() || (b'a'..=b'f').contains(&b);
+    let mut i = 0;
+    while i < bytes.len() {
+        if is_hex(bytes[i]) {
+            let start = i;
+            while i < bytes.len() && is_hex(bytes[i]) {
+                i += 1;
+            }
+            let run = i - start;
+            // A 64-hex run that is NOT part of a longer hex run (the seal/journal
+            // hex are far longer than 64) — the tx hash is exactly 64 hex chars.
+            if run == 64 {
+                return Some(output[start..i].to_string());
+            }
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
+/// Production settler: shells out to the real `stellar contract invoke … settle_batch`
+/// (identical to `scripts/seq_demo.sh`) and parses the tx hash. This is the ONLY
+/// settler on the product path — there is no mock.
+pub struct StellarCliSettler {
+    /// The deployed rollup contract id (`C…`).
+    rollup_id: String,
+    /// The signer key/name passed to `--source`.
+    source: String,
+    /// The network passed to `--network` (e.g. `testnet`).
+    network: String,
+}
+
+impl StellarCliSettler {
+    /// Build a settler that settles against `rollup_id`, signing with `source`, on
+    /// `network`.
+    pub fn new(
+        rollup_id: impl Into<String>,
+        source: impl Into<String>,
+        network: impl Into<String>,
+    ) -> Self {
+        Self {
+            rollup_id: rollup_id.into(),
+            source: source.into(),
+            network: network.into(),
+        }
+    }
+}
+
+#[async_trait]
+impl Settler for StellarCliSettler {
+    async fn settle(&self, proved: &ProvedBatch) -> Result<String, SettleError> {
+        let argv = settle_argv(&self.rollup_id, &self.source, &self.network, proved);
+        // Run blocking process on a blocking thread so we never stall the runtime.
+        let output = tokio::process::Command::new("stellar")
+            .args(&argv)
+            .output()
+            .await
+            .map_err(|e| SettleError::Invoke(format!("spawn stellar: {e}")))?;
+
+        let mut combined = String::new();
+        combined.push_str(&String::from_utf8_lossy(&output.stdout));
+        combined.push_str(&String::from_utf8_lossy(&output.stderr));
+
+        // Even on a non-zero exit we look for a hash; but if there is none, surface
+        // the combined output as the failure reason (honest `Failed{reason}`).
+        match parse_tx_hash(&combined) {
+            Some(h) => Ok(h),
+            None => {
+                if !output.status.success() {
+                    Err(SettleError::Invoke(format!(
+                        "stellar exited with {}: {}",
+                        output.status,
+                        combined.trim()
+                    )))
+                } else {
+                    Err(SettleError::NoTxHash(combined.trim().to_string()))
+                }
+            }
+        }
+    }
+
+    fn backend_label(&self) -> String {
+        format!("stellar-cli({}, rollup {})", self.network, &self.rollup_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_proved() -> ProvedBatch {
+        ProvedBatch {
+            seal: vec![0xde, 0xad, 0xbe, 0xef],
+            image_id: [0x11; 32],
+            journal: vec![0x01, 0x02, 0x03],
+        }
+    }
+
+    #[test]
+    fn argv_mirrors_seq_demo_sh_byte_for_byte() {
+        let proved = sample_proved();
+        let argv = settle_argv("CROLLUP", "spikekey", "testnet", &proved);
+        assert_eq!(
+            argv,
+            vec![
+                "contract",
+                "invoke",
+                "--id",
+                "CROLLUP",
+                "--source",
+                "spikekey",
+                "--network",
+                "testnet",
+                "--send=yes",
+                "--",
+                "settle_batch",
+                "--seal",
+                "deadbeef",
+                "--image_id",
+                // 32 bytes of 0x11 → 64 hex chars.
+                "1111111111111111111111111111111111111111111111111111111111111111",
+                "--journal_bytes",
+                "010203",
+            ]
+        );
+    }
+
+    #[test]
+    fn argv_hex_encodes_each_field_no_0x_prefix() {
+        let proved = sample_proved();
+        let argv = settle_argv("C", "s", "n", &proved);
+        // --seal value is at index 12, hex of the seal bytes, NO 0x prefix.
+        assert_eq!(argv[12], "deadbeef");
+        assert!(!argv[12].starts_with("0x"));
+        assert_eq!(argv[14].len(), 64, "image_id is 32 bytes → 64 hex");
+        assert_eq!(argv[16], "010203");
+    }
+
+    #[test]
+    fn parse_tx_hash_finds_first_64_hex() {
+        // A realistic stellar success line: the historic N=8 settle tx hash
+        // (64 hex chars) on its own.
+        let out = "ℹ️  Submitting transaction\n\
+                   aedc1cc42f112d65913d4b1b5fb0e9b5636481e2f10a86f85ed21f5c0f605ea9\n\
+                   ✅ Transaction succeeded\n";
+        let h = parse_tx_hash(out).expect("hash present");
+        assert_eq!(
+            h,
+            "aedc1cc42f112d65913d4b1b5fb0e9b5636481e2f10a86f85ed21f5c0f605ea9"
+        );
+        assert_eq!(h.len(), 64);
+    }
+
+    #[test]
+    fn parse_tx_hash_none_when_absent() {
+        assert_eq!(parse_tx_hash("no hash here, just words"), None);
+        // A short hex run (not 64) must NOT match.
+        assert_eq!(parse_tx_hash("deadbeef cafe"), None);
+    }
+
+    #[test]
+    fn parse_tx_hash_ignores_longer_hex_runs() {
+        // The seal/journal hex are FAR longer than 64; they must not be mistaken
+        // for the tx hash. A 128-hex run yields no 64-hex match.
+        let long_hex = "a".repeat(128);
+        assert_eq!(parse_tx_hash(&long_hex), None);
+        // But a 64-hex hash adjacent to words IS found.
+        let mixed = format!("seal={} tx=", long_hex);
+        let with_hash = format!("{}{}", mixed, "b".repeat(64));
+        assert_eq!(parse_tx_hash(&with_hash), Some("b".repeat(64)));
+    }
+}

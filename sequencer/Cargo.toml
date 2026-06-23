@@ -23,6 +23,15 @@ name = "seq_demo"
 path = "src/bin/seq_demo.rs"
 required-features = ["test-fixture"]
 
+# s3/02 HTTP server for the gate (FixtureProver + REAL settler, no GPU). Same
+# `required-features` gate → a plain `cargo build` does NOT compile it, so the
+# FixtureProver stays unreachable from production (candado 1). This is what the
+# s3/02 gate runs to drive the whole frontend SIN GPU.
+[[bin]]
+name = "seq_demo_http"
+path = "src/bin/seq_demo_http.rs"
+required-features = ["test-fixture"]
+
 [features]
 default = []
 # Test-only: exposes the FixtureProver (which LOADS the real N=8 receipt from
@@ -39,3 +48,12 @@ async-trait = "0.1"
 serde       = { version = "1", features = ["derive"] }
 serde_json  = "1"
 hex         = "0.4"
+
+# ── s3/02 HTTP API + async pipeline (the frontend connection layer) ───────────
+# tokio: the multi-thread runtime the HTTP server + background pipeline run on
+#   (also the async `stellar contract invoke` in StellarCliSettler).
+# axum/tower-http: the HTTP router + CORS (the frontend is a separate origin).
+tokio      = { version = "1", features = ["rt-multi-thread", "macros", "process", "time", "sync", "net"] }
+axum       = "0.8"
+tower      = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors"] }
