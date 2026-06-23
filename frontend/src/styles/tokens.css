@@ -1,0 +1,68 @@
+/*
+ * Sincerin — design tokens (DESIGN.md, LOCKED).
+ * B&W high-contrast, true-neutral (chroma 0). Color is NOT the brand carrier —
+ * contrast, type, motion and inversion are. The only non-neutral hues are the
+ * three functional STATE colors, and they appear only with an icon + label.
+ */
+
+:root {
+  /* ── Neutral ramp (OKLCH, chroma 0) ──────────────────────────────────── */
+  --bg: oklch(1 0 0); /* pure white — default canvas */
+  --bg-invert: oklch(0.145 0 0); /* near-black — inverted emphasis beats */
+  --ink: oklch(0.17 0 0); /* primary text on white — ≥ 4.5:1 */
+  --ink-invert: oklch(0.985 0 0); /* primary text on black */
+  --muted: oklch(0.5 0 0); /* secondary text on white — 4.5:1 */
+  --muted-invert: oklch(0.72 0 0); /* secondary text on black */
+  --line: oklch(0.91 0 0); /* hairline rules / borders on white */
+  --line-invert: oklch(0.28 0 0); /* hairline on black */
+  --surface: oklch(0.975 0 0); /* faint raised surface on white */
+  --surface-invert: oklch(0.2 0 0); /* faint raised surface on black */
+
+  /* ── Functional state colors — semantic only, icon+label always ──────── */
+  --state-settled: oklch(0.7 0.17 150);
+  --state-settled-ink: oklch(0.34 0.09 150); /* settled text on white — AA */
+  --state-proving: oklch(0.74 0.16 75);
+  --state-proving-ink: oklch(0.46 0.11 70); /* proving text on white — AA */
+  --state-failed: oklch(0.58 0.22 27);
+  --state-failed-ink: oklch(0.52 0.2 27); /* failed text on white — AA */
+
+  /* ── Typography roles ────────────────────────────────────────────────── */
+  --font-display: "Clash Display", "Archivo", system-ui, sans-serif;
+  --font-text: "General Sans", "Archivo", system-ui, sans-serif;
+  --font-data: "Martian Mono", ui-monospace, "SF Mono", monospace;
+
+  /* Fluid display scale, ratio ≥ 1.25, clamp ceiling ≤ 6rem (DESIGN.md). */
+  --fs-display: clamp(2.75rem, 1.6rem + 5.3vw, 5.5rem);
+  --fs-h2: clamp(1.75rem, 1.2rem + 2.4vw, 2.75rem);
+  --fs-h3: clamp(1.25rem, 1.05rem + 0.9vw, 1.6rem);
+  --fs-lead: clamp(1.05rem, 0.98rem + 0.4vw, 1.25rem);
+  --fs-body: 1rem;
+  --fs-sm: 0.875rem;
+  --fs-xs: 0.75rem;
+
+  /* ── Spacing — 8px base, fluid where it should breathe ───────────────── */
+  --s-1: 0.5rem;
+  --s-2: 1rem;
+  --s-3: 1.5rem;
+  --s-4: 2rem;
+  --s-5: 3rem;
+  --s-6: 4rem;
+  --s-section: clamp(3.5rem, 2rem + 7vw, 7rem);
+  --measure: 68ch;
+  --container: 75rem;
+
+  /* ── Motion ──────────────────────────────────────────────────────────── */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-fast: 160ms;
+  --dur: 320ms;
+  --dur-slow: 600ms;
+
+  /* ── Semantic z-index scale ──────────────────────────────────────────── */
+  --z-sticky: 100;
+  --z-dropdown: 200;
+  --z-modal-backdrop: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+  --z-tooltip: 600;
+}
