@@ -164,7 +164,131 @@
   }
 }
 
-/* ── 2 · Problem ────────────────────────────────────────────────────────── */
+/* ── 2 · Why Sincerin — 3 benefit cards ─────────────────────────────────── */
+.land-why-head {
+  max-width: 60ch;
+  margin-bottom: var(--s-5);
+}
+.land-why-head h2 {
+  max-width: 18ch;
+}
+.land-why-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid var(--ink);
+}
+.benefit {
+  padding: clamp(1.5rem, 1.1rem + 1.6vw, 2.5rem);
+  border-right: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.benefit:last-child {
+  border-right: none;
+}
+.benefit h3 {
+  font-size: var(--fs-h3);
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+.benefit p {
+  font-size: var(--fs-body);
+  color: var(--muted);
+  line-height: 1.6;
+}
+@media (max-width: 820px) {
+  .land-why-grid {
+    grid-template-columns: 1fr;
+  }
+  .benefit {
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+  }
+  .benefit:last-child {
+    border-bottom: none;
+  }
+}
+
+/* ── 3 · How it works — 3 plain steps ───────────────────────────────────── */
+.land-steps-head {
+  max-width: 60ch;
+  margin-bottom: var(--s-5);
+}
+.land-steps-head h2 {
+  max-width: 18ch;
+}
+.land-steps-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(1.5rem, 1rem + 2.5vw, 3rem);
+}
+.land-step {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding-top: var(--s-3);
+  border-top: 1px solid var(--ink);
+}
+.land-step-n {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--muted);
+}
+.land-step h3 {
+  font-size: var(--fs-h3);
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+}
+.land-step p {
+  font-size: var(--fs-body);
+  color: var(--muted);
+  line-height: 1.6;
+  max-width: 30ch;
+}
+@media (max-width: 760px) {
+  .land-steps-grid {
+    grid-template-columns: 1fr;
+  }
+  .land-step p {
+    max-width: none;
+  }
+}
+
+/* ── 4 · Privacy that scales ────────────────────────────────────────────── */
+.land-scales {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  gap: clamp(2rem, 1rem + 4vw, 5rem);
+  align-items: center;
+}
+.land-scales-copy h2 {
+  max-width: 14ch;
+}
+.land-scales-honest {
+  margin-top: var(--s-3);
+  padding-left: var(--s-2);
+  border-left: 2px solid var(--ink);
+  font-size: var(--fs-lead);
+  color: var(--ink);
+  line-height: 1.55;
+  max-width: 48ch;
+}
+@media (max-width: 900px) {
+  .land-scales {
+    grid-template-columns: 1fr;
+  }
+  .land-scales-viz {
+    order: -1;
+  }
+}
+
+/* ── (legacy, unused on the landing — kept for docs/bench reuse) ─────────── */
+/* ── Problem ────────────────────────────────────────────────────────────── */
 .land-problem {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
@@ -643,7 +767,27 @@
   margin-top: var(--s-4);
 }
 
-/* ── Landing footer extras ──────────────────────────────────────────────── */
+/* ── Landing footer — minimal: status line + two confident links ────────── */
+.appfoot-base--solo {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.appfoot-links {
+  display: flex;
+  gap: var(--s-3);
+  font-size: var(--fs-sm);
+}
+.appfoot-links a {
+  color: var(--ink);
+  text-decoration: none;
+}
+.appfoot-links a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+/* ── Landing footer extras (legacy — kept for reuse) ────────────────────── */
 .appfoot--landing .appfoot-inner {
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 0.7fr) minmax(0, 0.9fr);
 }

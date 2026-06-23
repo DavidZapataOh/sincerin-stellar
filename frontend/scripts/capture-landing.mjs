@@ -1,8 +1,7 @@
 /*
  * Capture the LANDING surface (/) for the s3/02 deliverable.
- *   landing-full-desktop.png   · full page, 1440
  *   landing-hero-desktop.png   · the hero fold, 1440
- *   landing-benchmark-desktop.png · the benchmark section, 1440
+ *   landing-full-desktop.png   · full page, 1440
  *   landing-full-mobile.png    · full page, 390
  * Run: node scripts/capture-landing.mjs   (dev server must be running on BASE_URL)
  */
@@ -46,21 +45,6 @@ async function run() {
   await dp.screenshot({ path: `${OUT}/landing-full-desktop.png`, fullPage: true });
   console.log("✓ landing-full-desktop.png");
 
-  // benchmark section, in view
-  const bench = dp.locator("#bench-title");
-  await bench.scrollIntoViewIfNeeded();
-  await sleep(700);
-  const benchSection = dp.locator(".land-bench");
-  await benchSection.screenshot({ path: `${OUT}/landing-benchmark-desktop.png` });
-  console.log("✓ landing-benchmark-desktop.png");
-
-  // privacy section (honest copy) — a meaningful brand beat
-  const priv = dp.locator(".land-privacy");
-  await priv.scrollIntoViewIfNeeded();
-  await sleep(500);
-  await priv.screenshot({ path: `${OUT}/landing-privacy-desktop.png` });
-  console.log("✓ landing-privacy-desktop.png");
-
   await desktop.close();
 
   // ── Mobile 390 ───────────────────────────────────────────────────────────
@@ -73,8 +57,6 @@ async function run() {
   const mp = await mobile.newPage();
   await mp.goto(`${BASE}/`, { waitUntil: "networkidle" });
   await mp.locator("#land-hero-title").waitFor({ state: "visible", timeout: 10000 });
-  await mp.screenshot({ path: `${OUT}/landing-hero-mobile.png` });
-  console.log("✓ landing-hero-mobile.png");
   await settle(mp);
   await mp.screenshot({ path: `${OUT}/landing-full-mobile.png`, fullPage: true });
   console.log("✓ landing-full-mobile.png");

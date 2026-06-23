@@ -11,7 +11,7 @@
 import type { SequencerConfig } from "../lib/api";
 import { truncateMiddle } from "../lib/format";
 import { Link } from "../lib/router";
-import { EVIDENCE, EXPLORER, contractUrl } from "../lib/evidence";
+import { EVIDENCE, EXPLORER, txUrl } from "../lib/evidence";
 
 const TrustStatement = () => (
   <p>
@@ -31,44 +31,20 @@ export function Footer(props: Props) {
   if (props.surface === "landing") {
     return (
       <footer className="appfoot appfoot--landing">
-        <div className="container appfoot-inner">
-          <div className="appfoot-statement">
-            <TrustStatement />
-          </div>
-          <nav className="appfoot-nav" aria-label="Footer">
-            <span className="appfoot-nav-head">Surfaces</span>
-            <Link to="/">Landing</Link>
-            <Link to="/demo">Demo</Link>
+        <div className="container appfoot-base appfoot-base--solo">
+          <span className="appfoot-wip">Live on Stellar testnet · open source</span>
+          <nav className="appfoot-links" aria-label="Footer">
             <a href={EXPLORER.repo} target="_blank" rel="noreferrer noopener">
-              Repository
+              GitHub
+            </a>
+            <a
+              href={txUrl(EVIDENCE.settleTx)}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              See a real settle
             </a>
           </nav>
-          <dl className="appfoot-meta">
-            <div>
-              <dt>Network</dt>
-              <dd>{EXPLORER.network}</dd>
-            </div>
-            <div>
-              <dt>Rollup</dt>
-              <dd>
-                <a className="mono" href={contractUrl(EVIDENCE.rollup)} target="_blank" rel="noreferrer noopener">
-                  {truncateMiddle(EVIDENCE.rollup)}
-                </a>
-              </dd>
-            </div>
-            <div>
-              <dt>Verifier</dt>
-              <dd>
-                <a className="mono" href={contractUrl(EVIDENCE.verifier)} target="_blank" rel="noreferrer noopener">
-                  {truncateMiddle(EVIDENCE.verifier)}
-                </a>
-              </dd>
-            </div>
-          </dl>
-        </div>
-        <div className="container appfoot-base">
-          <span className="appfoot-wip">WIP · not audited · testnet only</span>
-          <span className="appfoot-sig">Confidential Payments Rollup on Stellar</span>
         </div>
       </footer>
     );
