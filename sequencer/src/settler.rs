@@ -185,10 +185,26 @@ pub fn parse_rpc_status(json: &str) -> Option<String> {
 /// (`FAILED`, `NOT_FOUND`, `PENDING`, `UNKNOWN`, …) is an error → the driver marks
 /// the batch `Failed`, releases the lock, and the note can be re-submitted. The
 /// funds path is never reported settled on a tx that didn't actually apply.
-pub fn finalize_status(hash: String, _status: &str) -> Result<String, SettleError> {
-    // STUB (TDD red): unconditionally Ok — the FAILED / NOT_FOUND tests must fail
-    // against this until the real check is implemented.
-    Ok(hash)
+pub fn finalize_status(hash: String, status: &str) -> Result<String, SettleError> {
+    if status == "SUCCESS" {
+        Ok(hash)
+    } else {
+        Err(SettleError::OnchainFailed {
+            hash,
+            status: status.to_string(),
+        })
+    }
+}
+
+/// Default Soroban RPC URL for a known network — mirrors the gate scripts
+/// (`scripts/seq_demo.sh`, `scripts/seq_http_gate.sh`). Unknown networks fall back
+/// to the testnet RPC (the only network the product path settles on today).
+pub fn default_rpc_url(network: &str) -> String {
+    match network {
+        "futurenet" => "https://rpc-futurenet.stellar.org",
+        _ => "https://soroban-testnet.stellar.org",
+    }
+    .to_string()
 }
 
 /// Production settler: shells out to the real `stellar contract invoke … settle_batch`
@@ -201,21 +217,79 @@ pub struct StellarCliSettler {
     source: String,
     /// The network passed to `--network` (e.g. `testnet`).
     network: String,
+    /// Soroban RPC URL used to re-confirm `getTransaction == SUCCESS` before a
+    /// batch is reported settled (derived from `network`; overridable for tests).
+    rpc_url: String,
 }
 
 impl StellarCliSettler {
     /// Build a settler that settles against `rollup_id`, signing with `source`, on
-    /// `network`.
+    /// `network`. The RPC URL is derived from the network ([`default_rpc_url`]).
     pub fn new(
         rollup_id: impl Into<String>,
         source: impl Into<String>,
         network: impl Into<String>,
     ) -> Self {
+        let network = network.into();
+        let rpc_url = default_rpc_url(&network);
         Self {
             rollup_id: rollup_id.into(),
             source: source.into(),
-            network: network.into(),
+            network,
+            rpc_url,
         }
+    }
+
+    /// Override the Soroban RPC URL (e.g. a private endpoint). Builder form.
+    pub fn with_rpc_url(mut self, rpc_url: impl Into<String>) -> Self {
+        self.rpc_url = rpc_url.into();
+        self
+    }
+
+    /// Re-confirm a submitted settle tx on-chain via RPC `getTransaction`, returning
+    /// the observed status string. A tx may briefly read `NOT_FOUND`/`PENDING` right
+    /// after submit, so we poll a few times with a short backoff and accept the first
+    /// terminal status (`SUCCESS`/`FAILED`). Any transient/unreachable case falls
+    /// through to the last-seen status (typically `NOT_FOUND`) → treated as not
+    /// confirmed by [`finalize_status`]. Shells `curl` (same as the gate scripts; no
+    /// new HTTP dependency).
+    async fn confirm_status(&self, hash: &str) -> Result<String, SettleError> {
+        let body = format!(
+            r#"{{"jsonrpc":"2.0","id":1,"method":"getTransaction","params":{{"hash":"{hash}"}}}}"#
+        );
+        let mut last = String::from("UNKNOWN");
+        for attempt in 0..5 {
+            let out = tokio::process::Command::new("curl")
+                .args([
+                    "-s",
+                    "-X",
+                    "POST",
+                    &self.rpc_url,
+                    "-H",
+                    "Content-Type: application/json",
+                    "-d",
+                    &body,
+                ])
+                .output()
+                .await
+                .map_err(|e| SettleError::Invoke(format!("spawn curl (getTransaction): {e}")))?;
+
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if let Some(status) = parse_rpc_status(&stdout) {
+                    last = status.clone();
+                    // SUCCESS/FAILED are terminal — stop polling immediately.
+                    if status == "SUCCESS" || status == "FAILED" {
+                        return Ok(status);
+                    }
+                }
+            }
+            // transient (NOT_FOUND / PENDING / curl error): brief backoff, then retry
+            if attempt < 4 {
+                tokio::time::sleep(std::time::Duration::from_millis(900)).await;
+            }
+        }
+        Ok(last)
     }
 }
 
@@ -234,25 +308,21 @@ impl Settler for StellarCliSettler {
         combined.push_str(&String::from_utf8_lossy(&output.stdout));
         combined.push_str(&String::from_utf8_lossy(&output.stderr));
 
-        // A FAILED settle (non-zero exit: revert, simulation error, missing
-        // contract) must NEVER be reported as settled. Its diagnostics can contain
-        // OTHER 64-hex values that are NOT a tx hash — notably the contract-computed
-        // `sha256(journal_bytes)` (the journal digest), which would otherwise be
-        // mis-parsed and shown to a judge as a "Settle tx" that 404s on the explorer.
-        // Only a successful invoke yields a real settle tx → require success FIRST.
-        if !output.status.success() {
-            return Err(SettleError::Invoke(format!(
-                "stellar exited with {}: {}",
-                output.status,
-                combined.trim()
-            )));
-        }
-        // On success, exclude the image_id (echoed as --image_id, also 64 hex) so we
-        // return the real tx hash, never the image_id.
-        match parse_tx_hash(&combined, &hex::encode(proved.image_id)) {
-            Some(h) => Ok(h),
-            None => Err(SettleError::NoTxHash(combined.trim().to_string())),
-        }
+        // EJE 1: success gate + image_id exclusion (a non-zero exit NEVER yields a
+        // hash — its diagnostics can carry the journal digest, another 64-hex).
+        let hash = parse_settle_output(
+            output.status.success(),
+            &combined,
+            &hex::encode(proved.image_id),
+        )?;
+
+        // EJE 3: the CLI exiting 0 means the command ran — NOT that the tx applied
+        // in the ledger. Re-confirm on-chain via RPC and require SUCCESS before
+        // declaring settled (same guarantee the gate scripts enforce). A FAILED /
+        // NOT_FOUND tx → OnchainFailed → Failed (lock released, re-submit possible);
+        // the funds path is never reported settled on a tx that didn't move funds.
+        let status = self.confirm_status(&hash).await?;
+        finalize_status(hash, &status)
     }
 
     fn backend_label(&self) -> String {
