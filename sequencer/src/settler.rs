@@ -173,23 +173,24 @@ impl Settler for StellarCliSettler {
         combined.push_str(&String::from_utf8_lossy(&output.stdout));
         combined.push_str(&String::from_utf8_lossy(&output.stderr));
 
-        // Even on a non-zero exit we look for a hash; but if there is none, surface
-        // the combined output as the failure reason (honest `Failed{reason}`).
-        // Exclude the image_id (echoed by `stellar` as the --image_id arg, also 64
-        // hex) so we return the real tx hash, never the image_id.
+        // A FAILED settle (non-zero exit: revert, simulation error, missing
+        // contract) must NEVER be reported as settled. Its diagnostics can contain
+        // OTHER 64-hex values that are NOT a tx hash — notably the contract-computed
+        // `sha256(journal_bytes)` (the journal digest), which would otherwise be
+        // mis-parsed and shown to a judge as a "Settle tx" that 404s on the explorer.
+        // Only a successful invoke yields a real settle tx → require success FIRST.
+        if !output.status.success() {
+            return Err(SettleError::Invoke(format!(
+                "stellar exited with {}: {}",
+                output.status,
+                combined.trim()
+            )));
+        }
+        // On success, exclude the image_id (echoed as --image_id, also 64 hex) so we
+        // return the real tx hash, never the image_id.
         match parse_tx_hash(&combined, &hex::encode(proved.image_id)) {
             Some(h) => Ok(h),
-            None => {
-                if !output.status.success() {
-                    Err(SettleError::Invoke(format!(
-                        "stellar exited with {}: {}",
-                        output.status,
-                        combined.trim()
-                    )))
-                } else {
-                    Err(SettleError::NoTxHash(combined.trim().to_string()))
-                }
-            }
+            None => Err(SettleError::NoTxHash(combined.trim().to_string())),
         }
     }
 
