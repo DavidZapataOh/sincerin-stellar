@@ -15,9 +15,9 @@ interface Item {
 
 const ITEMS: Item[] = [
   { src: "/logos/stellar.png", name: "Stellar" },
-  { src: "/logos/soroban.jpg", name: "Soroban", cls: "ecostrip-logo--wide" },
-  { src: "/logos/risc0.webp", name: "RISC Zero", cls: "ecostrip-logo--risc0" },
-  { src: "/logos/bn254.jpg", name: "BN254" },
+  { src: "/logos/soroban.png", name: "Soroban" },
+  { src: "/logos/risc0.png", name: "RISC Zero", cls: "ecostrip-logo--risc0" },
+  { src: "/logos/bn254.png", name: "BN254" },
 ];
 
 export function EcosystemStrip() {

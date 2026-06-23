@@ -202,54 +202,36 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: clamp(1.5rem, 0.5rem + 4vw, 4rem);
+  flex-wrap: wrap;
 }
 .ecostrip-item {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  gap: 0.6rem;
-  padding-inline: clamp(0.75rem, 0.4rem + 1.2vw, 1.6rem);
-  border-left: 1px solid var(--line);
   min-width: 0;
 }
-.ecostrip-item:first-child {
-  border-left: none;
-  padding-left: 0;
-}
-/* uniform optical box: every mark is centered in the same height; widths vary
-   (a wordmark is wider than a symbol) but object-fit keeps them all balanced. */
 .ecostrip-media {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  height: 42px;
-  width: 100%;
 }
+/* The source images are TRIMMED to their content (no internal whitespace), so a
+   single uniform HEIGHT makes every mark read at the same visual size — a symbol
+   and a wordmark share the same cap height, widths follow naturally. */
 .ecostrip-logo {
-  max-height: 40px;
-  max-width: 100%;
+  height: 27px;
   width: auto;
-  object-fit: contain;
-  /* normalise to a single monochrome reading so the row isn't a mismatch of
-     blue/black/inverted marks against the B&W brand. */
-  filter: grayscale(1) contrast(1.05);
+  /* normalise to one monochrome reading (the marks ship in mixed colours) */
+  filter: grayscale(1) contrast(1.04);
   opacity: 0.88;
   transition: opacity 0.2s ease;
 }
 .ecostrip-item:hover .ecostrip-logo {
   opacity: 1;
 }
-/* Soroban is a full wordmark — its width is capped by the cell, so it sits a
-   little shorter than the square marks; this keeps it legible, not tiny. */
-.ecostrip-logo--wide {
-  max-height: 30px;
-}
-/* RISC Zero ships white-on-black; invert it to black-on-white to match the rest
-   (grayscale then neutralises any residual tint). */
+/* RISC Zero ships white-on-black; invert it to black-on-white to match the rest. */
 .ecostrip-logo--risc0 {
   filter: grayscale(1) invert(1);
 }
@@ -264,15 +246,8 @@
 }
 @media (max-width: 560px) {
   .ecostrip-list {
-    grid-template-columns: repeat(2, 1fr);
-    gap: var(--s-3) 0;
-  }
-  .ecostrip-item {
-    padding: 0 0.6rem;
-  }
-  .ecostrip-item:nth-child(odd) {
-    border-left: none;
-    padding-left: 0;
+    justify-content: flex-start;
+    gap: 1.4rem 2.2rem;
   }
 }
 
