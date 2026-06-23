@@ -95,11 +95,19 @@ pub fn settle_argv(
     ]
 }
 
-/// Parse the FIRST 64-hex transaction hash out of `stellar`'s combined output
-/// (stdout+stderr). Mirrors the gate's `grep -oE '[a-f0-9]{64}' | head -1`.
+/// Parse the settle transaction hash out of `stellar`'s combined output
+/// (stdout+stderr): the FIRST 64-hex run that is NOT `exclude`.
 ///
-/// Returns `None` if no 64-char run of lowercase-hex is present.
-pub fn parse_tx_hash(output: &str) -> Option<String> {
+/// CRITICAL: `stellar contract invoke` echoes the `--image_id <hex>` arg, and the
+/// image_id is ALSO exactly 32 bytes → 64 hex — the same width as a tx hash, and it
+/// appears BEFORE the tx hash. A naive "first 64-hex" therefore returns the
+/// image_id (`cbeab7aa…`), which a judge would click into a 404 on the explorer.
+/// `exclude` is the image_id hex; we skip it so the OTHER 64-hex run (the real tx
+/// hash) is returned. The seal/journal hex are far longer than 64 (single runs) so
+/// they never match `run == 64`.
+///
+/// Returns `None` if no qualifying 64-char lowercase-hex run is present.
+pub fn parse_tx_hash(output: &str, exclude: &str) -> Option<String> {
     let bytes = output.as_bytes();
     let is_hex = |b: u8| b.is_ascii_digit() || (b'a'..=b'f').contains(&b);
     let mut i = 0;
@@ -109,11 +117,11 @@ pub fn parse_tx_hash(output: &str) -> Option<String> {
             while i < bytes.len() && is_hex(bytes[i]) {
                 i += 1;
             }
-            let run = i - start;
-            // A 64-hex run that is NOT part of a longer hex run (the seal/journal
-            // hex are far longer than 64) — the tx hash is exactly 64 hex chars.
-            if run == 64 {
-                return Some(output[start..i].to_string());
+            if i - start == 64 {
+                let run = &output[start..i];
+                if run != exclude {
+                    return Some(run.to_string());
+                }
             }
         } else {
             i += 1;
@@ -167,7 +175,9 @@ impl Settler for StellarCliSettler {
 
         // Even on a non-zero exit we look for a hash; but if there is none, surface
         // the combined output as the failure reason (honest `Failed{reason}`).
-        match parse_tx_hash(&combined) {
+        // Exclude the image_id (echoed by `stellar` as the --image_id arg, also 64
+        // hex) so we return the real tx hash, never the image_id.
+        match parse_tx_hash(&combined, &hex::encode(proved.image_id)) {
             Some(h) => Ok(h),
             None => {
                 if !output.status.success() {
@@ -247,7 +257,7 @@ mod tests {
         let out = "ℹ️  Submitting transaction\n\
                    aedc1cc42f112d65913d4b1b5fb0e9b5636481e2f10a86f85ed21f5c0f605ea9\n\
                    ✅ Transaction succeeded\n";
-        let h = parse_tx_hash(out).expect("hash present");
+        let h = parse_tx_hash(out, "").expect("hash present");
         assert_eq!(
             h,
             "aedc1cc42f112d65913d4b1b5fb0e9b5636481e2f10a86f85ed21f5c0f605ea9"
@@ -256,10 +266,26 @@ mod tests {
     }
 
     #[test]
+    fn parse_tx_hash_skips_the_image_id() {
+        // Realistic invoke output: `stellar` echoes the --image_id arg (the deployed
+        // guest image_id, 64 hex) BEFORE the result tx hash (also 64 hex). The parser
+        // MUST return the tx hash, not the image_id — else the explorer link 404s.
+        let image_id = "cbeab7aa6ce69944e10cca8c7ed94d15aae297f2580752f07a15c6cab6ba0d46";
+        let tx = "1f9fd5906a51332a790cfc2ce1ab135653cfafe5472ea5fac30a3a5bc0f04cb7";
+        let out = format!(
+            "invoke … --image_id {image_id} --journal_bytes 0a0b0c…\n\
+             ℹ️  Submitting transaction\n{tx}\n✅ Transaction succeeded\n"
+        );
+        assert_eq!(parse_tx_hash(&out, image_id).as_deref(), Some(tx));
+        // Sanity: WITHOUT the exclusion the bug returns the image_id (the regression).
+        assert_eq!(parse_tx_hash(&out, "").as_deref(), Some(image_id));
+    }
+
+    #[test]
     fn parse_tx_hash_none_when_absent() {
-        assert_eq!(parse_tx_hash("no hash here, just words"), None);
+        assert_eq!(parse_tx_hash("no hash here, just words", ""), None);
         // A short hex run (not 64) must NOT match.
-        assert_eq!(parse_tx_hash("deadbeef cafe"), None);
+        assert_eq!(parse_tx_hash("deadbeef cafe", ""), None);
     }
 
     #[test]
@@ -267,10 +293,10 @@ mod tests {
         // The seal/journal hex are FAR longer than 64; they must not be mistaken
         // for the tx hash. A 128-hex run yields no 64-hex match.
         let long_hex = "a".repeat(128);
-        assert_eq!(parse_tx_hash(&long_hex), None);
+        assert_eq!(parse_tx_hash(&long_hex, ""), None);
         // But a 64-hex hash adjacent to words IS found.
         let mixed = format!("seal={} tx=", long_hex);
         let with_hash = format!("{}{}", mixed, "b".repeat(64));
-        assert_eq!(parse_tx_hash(&with_hash), Some("b".repeat(64)));
+        assert_eq!(parse_tx_hash(&with_hash, ""), Some("b".repeat(64)));
     }
 }
