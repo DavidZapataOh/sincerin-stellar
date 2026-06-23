@@ -23,7 +23,7 @@ export const EVIDENCE = {
 export const EXPLORER = {
   network: "testnet",
   base: "https://stellar.expert/explorer/testnet",
-  repo: "https://github.com/sincerin-stellar/sincerin",
+  repo: "https://github.com/DavidZapataOh/sincerin-stellar",
 } as const;
 
 export function txUrl(hash: string): string {

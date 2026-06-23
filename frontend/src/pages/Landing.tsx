@@ -246,9 +246,10 @@ function Benchmark() {
           <a href={txUrl(EVIDENCE.settleTx)} target="_blank" rel="noreferrer noopener" className="mono">
             aedc1cc4…
           </a>
-          ). Proving N=8 took <strong>4h 26m</strong> end-to-end on Apple Silicon
-          — real ZK work, never dev-mode. N=16/32 on-chain cost is projected
-          (1 Groth16 verify + ~0.77M per note) and labelled as such.
+          ). Proving N=8 takes <strong>~5 min on a GPU</strong> (measured, native
+          CUDA — the production path) — real ZK work, never dev-mode. N=16/32
+          on-chain cost is projected (1 Groth16 verify + ~0.77M per note) and
+          labelled as such.
         </p>
       </Reveal>
     </section>
