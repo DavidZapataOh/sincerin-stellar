@@ -14,7 +14,8 @@ const ADDR =
   process.env.PREVIEW_ADDR ??
   "GB5MVC4HEWWBRF7TE3DVVS5F5K7EBJ37UMPKNDGXLL37SDTHLBIBINOL";
 const OUT = process.env.OUT_DIR ?? "screenshots";
-const url = `${BASE}/?previewAddress=${ADDR}`;
+// The functional pipeline now lives on the /demo surface (s3/02 two-surface split).
+const url = `${BASE}/demo?previewAddress=${ADDR}`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

@@ -8,15 +8,19 @@ if (typeof globalThis.Buffer === "undefined") {
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
+import { RouterProvider } from "./lib/router";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app.css";
+import "./styles/landing.css";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <RouterProvider>
+      <App />
+    </RouterProvider>
   </StrictMode>,
 );

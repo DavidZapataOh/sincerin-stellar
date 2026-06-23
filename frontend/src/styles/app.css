@@ -333,7 +333,11 @@
 .invert .aggviz-particle {
   fill: var(--ink-invert);
 }
-.aggviz.is-active .aggviz-particle {
+/* The amber "proving" tint on flowing particles is reserved for the DEMO's
+   live proving viz only (inside .status-viz). On the landing the flow is
+   decorative/explanatory, so it stays monochrome — one state accent (green)
+   only, no competing second hue (DESIGN.md). */
+.status-viz .aggviz.is-active .aggviz-particle {
   fill: var(--state-proving);
 }
 .aggviz-settle-ring {
@@ -518,6 +522,7 @@
   gap: 0.15rem;
 }
 .iconbtn {
+  position: relative;
   display: inline-grid;
   place-items: center;
   width: 28px;
@@ -529,6 +534,12 @@
   transition:
     color var(--dur-fast) var(--ease-out-quart),
     border-color var(--dur-fast) var(--ease-out-quart);
+}
+/* Expand the tap target to ~44px without growing the visual (WCAG 2.5.5). */
+.iconbtn::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
 }
 .iconbtn:hover {
   color: var(--ink);
