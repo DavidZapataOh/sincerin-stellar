@@ -221,7 +221,7 @@
    single uniform HEIGHT makes every mark read at the same visual size — a symbol
    and a wordmark share the same cap height, widths follow naturally. */
 .ecostrip-logo {
-  height: 27px;
+  height: 34px;
   width: auto;
   /* normalise to one monochrome reading (the marks ship in mixed colours) */
   filter: grayscale(1) contrast(1.04);
