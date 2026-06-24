@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import {
@@ -90,35 +90,69 @@ describe("the N≈12 crossover is real (the differentiator)", () => {
   });
 });
 
-describe("honesty lint: never flat/plano/constant about the aggregate", () => {
-  const FORBIDDEN = /\b(flat|plano|constant)\b/i;
+describe("honesty lint — no aggregate overclaim in ANY public-facing copy", () => {
+  const FORBIDDEN = /\b(flat|plano|constant)\b|barely\s+(moves|grows|changes)/i;
 
   it("the aggregate claim copy is honest", () => {
     expect(AGGREGATE_CLAIM.length).toBeGreaterThan(0);
     expect(AGGREGATE_CLAIM).not.toMatch(FORBIDDEN);
   });
 
-  it("the hero crystal note labels are honest (corrected)", () => {
-    const src = readFileSync(resolve(here, "../components/ProofCrystal.tsx"), "utf8");
-    const labels = [...src.matchAll(/crystal-note-l">([^<]*)</g)].map((m) => m[1]);
-    expect(labels.length).toBeGreaterThan(0);
-    for (const label of labels) expect(label).not.toMatch(FORBIDDEN);
-  });
+  /*
+   * Deny-by-default scan over EVERY judge-readable file: the README, all docs,
+   * and all frontend copy (pages, demo views, components, lib). A line carrying a
+   * forbidden term passes ONLY if it also contains one of these audited honest
+   * markers — an explicit negation, the ~constant SNARK SUBcomponent, Poseidon2
+   * round-constants, flat-top hexagon geometry, or a "never …" meta-note. Adding a
+   * new honest use must be a deliberate allowlist edit. Anything else FAILS — so
+   * a hidden "constant in N" / "flat" / "barely moves" can't ship.
+   */
+  const ALLOW = [
+    "flat-top", // hexagon geometry, not cost
+    "not flat", // explicit negation (en)
+    "not** flat", // explicit negation (markdown bold)
+    "no es plano", // explicit negation (es)
+    "~constant", // the SNARK verify SUBcomponent (~constant) — honest, also covers ~constante
+    "round constant", // Poseidon2 round constants (crypto, not cost)
+    "round-constant",
+    "params constant",
+    "every constant",
+    "never flat", // meta-comments: "GROWS … never flat/constant"
+    'never "flat',
+    'never "constant',
+  ].map((s) => s.toLowerCase());
 
-  it("no deliverable claims the AGGREGATE cost is constant/flat in N (the exact overclaim)", () => {
-    // Precise patterns: these phrasings only ever describe the aggregate TOTAL —
-    // the honest "~constant Groth16 verification" (the subcomponent) and explicit
-    // negations ("not flat", "NO es plano") are intentionally NOT matched.
-    const OVERCLAIM = /\b(constant in n|constante en n|constant cost regardless|flat in n|plano en n)\b/i;
-    const files = [
-      resolve(here, "../components/ProofCrystal.tsx"),
-      resolve(here, "../../../README.md"),
-      resolve(here, "../../../docs/proving-times.md"),
-    ];
-    for (const f of files) {
-      expect(readFileSync(f, "utf8"), `${f} claims the aggregate is constant/flat in N`).not.toMatch(
-        OVERCLAIM,
-      );
+  const isTest = (f: string) => /\.test\.tsx?$/.test(f);
+  const walk = (dir: string, out: string[] = []): string[] => {
+    for (const e of readdirSync(dir)) {
+      const full = resolve(dir, e);
+      if (statSync(full).isDirectory()) {
+        if (e !== "node_modules" && e !== "dist") walk(full, out);
+      } else if (/\.(tsx?|md)$/.test(e) && !isTest(full)) {
+        out.push(full);
+      }
     }
+    return out;
+  };
+
+  it("every public file: any unallowlisted flat/plano/constant/barely-moves FAILS", () => {
+    const root = resolve(here, "../../..");
+    const files = [
+      ...walk(resolve(here, "..")), // frontend/src/**
+      ...walk(resolve(root, "docs")), // docs/**.md
+      resolve(root, "README.md"),
+    ];
+    const violations: string[] = [];
+    for (const f of files) {
+      readFileSync(f, "utf8")
+        .split("\n")
+        .forEach((line, i) => {
+          if (!FORBIDDEN.test(line)) return;
+          const low = line.toLowerCase();
+          if (ALLOW.some((a) => low.includes(a))) return;
+          violations.push(`${f.replace(`${root}/`, "")}:${i + 1}  ${line.trim().slice(0, 90)}`);
+        });
+    }
+    expect(violations, `overclaim(s) in public copy:\n${violations.join("\n")}`).toEqual([]);
   });
 });

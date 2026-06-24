@@ -1,31 +1,32 @@
 /*
- * Two-axis benchmark — the project's differentiator, inline.
+ * Two-axis benchmark — the project's differentiator, inline in the demo result.
  *
- * All numbers are MEASURED on-chain values (docs/proving-times.md "Eje 2"):
- *   N=2 settle 31.5M (~7.9%), N=8 settle 36,118,956 (~9.0%, tx aedc1cc4…).
- *   Projected N=16 ~43.8M, N=32 ~56.1M (1 Groth16 verify + 0.77M/note).
- * Baseline = N individual pool verifications (N × ~35M) — crosses the 400M
- * single-tx budget at N≈12, so large batches are impossible WITHOUT aggregation.
+ * Numbers come from the SINGLE source of truth (src/lib/benchmark.ts == docs/
+ * proving-times.md) — no local copy, no drift with the /benchmarks page. Baseline
+ * = N individual pool verifications (N × ~35M) crosses the 400M single-tx budget
+ * at N≈12, so large batches are impossible WITHOUT aggregation.
  *
- * Honest by construction: measured vs projected are labelled distinctly; the
- * full chart is s3/01 — this is the tasteful inline version (plan §3.3).
+ * Honest by construction: measured vs projected are labelled distinctly, and the
+ * aggregate is described as GROWING sub-linearly — never flat/constant.
  */
 
-const BUDGET = 400; // M instructions — Soroban single-tx limit.
+import { ROWS, BUDGET as BUDGET_INSN, BASELINE_VERIFY } from "../lib/benchmark";
+
+const BUDGET = BUDGET_INSN / 1e6; // 400 (M instructions — Soroban single-tx limit)
 
 interface Point {
   n: number;
-  aggregated: number; // M instr — settle, ~flat
+  aggregated: number; // M instr — settle, grows sub-linearly
   baseline: number; // M instr — N × ~35M
   measured: boolean;
 }
 
-const DATA: Point[] = [
-  { n: 2, aggregated: 31.5, baseline: 70, measured: true },
-  { n: 8, aggregated: 36.1, baseline: 280, measured: true },
-  { n: 16, aggregated: 43.8, baseline: 560, measured: false },
-  { n: 32, aggregated: 56.1, baseline: 1120, measured: false },
-];
+const DATA: Point[] = ROWS.map((r) => ({
+  n: r.n,
+  aggregated: r.settleAggInsn / 1e6,
+  baseline: r.baselineInsn / 1e6,
+  measured: r.settleFlag === "measured",
+}));
 
 export function BenchChart() {
   const W = 560;
@@ -48,7 +49,7 @@ export function BenchChart() {
     .join(" ");
 
   // crossing point of baseline with the 400M budget: 35·N = 400 ⇒ N ≈ 11.4
-  const crossN = 400 / 35;
+  const crossN = BUDGET_INSN / BASELINE_VERIFY;
 
   return (
     <figure className="bench">
@@ -56,7 +57,7 @@ export function BenchChart() {
         className="bench-svg"
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="On-chain cost by batch size N. Aggregated settle stays roughly flat near 9% of the 400M single-transaction budget; N individual verifications grow linearly and exceed the budget past N≈12."
+        aria-label="On-chain cost by batch size N. The aggregated settle grows sub-linearly, staying near 9 to 14 percent of the 400M single-transaction budget; N individual verifications grow linearly and exceed the budget past N≈12."
         preserveAspectRatio="xMidYMid meet"
       >
         {/* budget ceiling */}
@@ -99,7 +100,7 @@ export function BenchChart() {
           baseline exceeds budget · N≈12
         </text>
 
-        {/* aggregated settle — solid, the flat line that is the whole point */}
+        {/* aggregated settle — solid; stays inside the budget but grows */}
         <polyline points={aggLine} className="bench-agg" />
         {DATA.map((d) => (
           <g key={d.n}>
@@ -110,7 +111,7 @@ export function BenchChart() {
               className={`bench-dot ${d.measured ? "is-measured" : "is-projected"}`}
             />
             <text x={x(d.n)} y={y(d.aggregated) - 12} className="bench-dotlabel" textAnchor="middle">
-              {d.aggregated}M
+              {d.aggregated.toFixed(1)}M
             </text>
           </g>
         ))}
@@ -126,7 +127,7 @@ export function BenchChart() {
       <figcaption className="bench-legend">
         <span className="bench-key">
           <span className="bench-key-swatch bench-key-swatch--agg" /> Aggregated settle
-          <span className="bench-key-note"> · 1 Groth16 verify, ~flat in N</span>
+          <span className="bench-key-note"> · 1 Groth16 verify + N transfers, grows sub-linearly</span>
         </span>
         <span className="bench-key">
           <span className="bench-key-swatch bench-key-swatch--base" /> N individual

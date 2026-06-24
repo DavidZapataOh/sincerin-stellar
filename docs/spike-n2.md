@@ -83,5 +83,5 @@ The ZK verification happened ON-CHAIN in testnet (RPC `getTransaction` status `S
 
 On-chain cost for the N=2 verification:
 - cpu_insn: ~31.5M (7.9% of the 400M ledger budget — lower than the spike's ~35.3M, within expected variance)
-- Cost is **constant in N** (the verifier always verifies 1 Groth16 proof regardless of N)
+- The **SNARK verification is ~constant** (always 1 Groth16 proof); the total settle still grows sub-linearly with N (1 verify + N small transfers — see docs/proving-times.md)
 - This anchors the s3 benchmark table for the on-chain axis

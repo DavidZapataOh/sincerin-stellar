@@ -106,11 +106,11 @@ export function ResultView({
             <div className="benchwrap-head">
               <h3>Why aggregate</h3>
               <p className="prose prose--muted">
-                One verification, settled for all {n}. The aggregated cost stays
-                roughly flat in N near 9% of the single-transaction budget;{" "}
-                {n} individual pool verifications would grow linearly and exceed
-                the 400M budget past N≈12 — so large batches are impossible{" "}
-                <em>without</em> aggregation.
+                One verification, settled for all {n}. The aggregated cost grows
+                sub-linearly — a fraction of the single-transaction budget that
+                climbs slowly with N; {n} individual pool verifications would grow
+                linearly and exceed the 400M budget past N≈12 — so large batches
+                are impossible <em>without</em> aggregation.
               </p>
             </div>
             <BenchChart />
