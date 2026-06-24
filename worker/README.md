@@ -36,18 +36,37 @@ expect a multi-GB image and a 15–30 min build.
 
 ## RunPod serverless endpoint — REQUIRED guardrails (confirm BEFORE the first real job)
 
+> **GPU selection is by VRAM CATEGORY, not exact model** (RunPod docs). The 3090
+> lives in the category **"L4, A5000, 3090 (24 GB)"** — selecting it means the
+> worker may run on L4, A5000, OR RTX 3090. All three are Ampere/Ada, CUDA-12.4
+> compatible, **NONE is Blackwell** (B200 is its own unselected category). Select
+> ONLY this one category → no fallback to others → the worker can NEVER touch
+> Blackwell. The handler's runtime gate is the final backstop.
+
 Create a Serverless endpoint from the pushed image with, explicitly:
 
-- [ ] **GPU: RTX 3090** (Ampere, sm_86 — the PARADA-1 hardware; the 5m04s number
-      holds). NOT Blackwell — the handler's startup gate refuses it anyway.
-- [ ] **Min workers = 0** → **$0 when idle** (scale-to-zero). No always-on worker.
+- [ ] **GPU category: ONLY "L4, A5000, 3090 (24 GB)"** — no other category selected
+      (so there is no fallback to a non-compatible GPU). The actual GPU per job is
+      reported in the output (`gpu`); a 3090 is the direct PARADA-1 comparison.
+- [ ] **(if available) Allowed CUDA version ≥ 12.4** — extra host-driver guard.
+- [ ] **Active (min) workers = 0** → **$0 when idle** (scale-to-zero). No always-on.
 - [ ] **Max workers = 1–2** → a runaway can't fan out.
-- [ ] **Execution timeout ≈ 900 s (15 min)** per job → a hung prove is killed, not
-      billed forever (a real N=8 prove is ~5 min; 15 min is generous headroom).
+- [ ] **Execution timeout = 900 s (15 min)** (the default is 600 s; raise it) → a
+      hung prove is killed, not billed forever (a real N=8 prove is ~5 min).
 - [ ] **Spending limit / billing alert** set on the RunPod account.
 
 The sequencer reads `RUNPOD_ENDPOINT_ID` + `RUNPOD_API_KEY` from env (and optional
 `RUNPOD_BASE_URL`). Never commit the API key.
+
+After the endpoint exists and the image is baked, run **one** Stop-A prove and
+paste the result:
+
+```bash
+RUNPOD_ENDPOINT_ID=xxxx RUNPOD_API_KEY=yyyy bash scripts/stopA_remote_prove.sh
+```
+
+It checks: which GPU ran · prove ≈ 5m04s · seal ≠ ffffffff · image_id == the
+canonical deployed guest (byte-parity of the baked guest).
 
 ## Cost (RTX 3090 serverless, per-second; verify current pricing)
 

@@ -17,20 +17,28 @@ import os
 import pathlib
 import subprocess
 import tempfile
+import time
 
 import runpod
 
 HOST_BIN = "/sincerin/target/release/host"
 
+# GPU identity, captured once at startup so Stop-A can see WHICH GPU ran (the
+# RunPod "24 GB" category bundles L4/A5000/3090; the 5min number is the 3090's).
+GPU_NAME = "unknown"
+GPU_CC = "unknown"
+
 
 def _startup_gate() -> None:
     """Reject Blackwell (sm_100/sm_120, CC>=10) and pre-Volta (<sm_70) GPUs early."""
+    global GPU_NAME, GPU_CC
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,compute_cap", "--format=csv,noheader"],
             capture_output=True, text=True, timeout=20,
         ).stdout.strip().splitlines()[0]
         name, cc = [p.strip() for p in out.split(",")][:2]
+        GPU_NAME, GPU_CC = name, cc
         major = int(cc.split(".")[0])
         sm = "sm_" + cc.replace(".", "")
         if major >= 10:
@@ -60,10 +68,12 @@ def handler(job):
         inputs_path.write_text(json.dumps(inp))
 
         env = dict(os.environ, RISC0_DEV_MODE="0", ROLLUP_LOCAL_GUEST="1")
+        t0 = time.monotonic()
         proc = subprocess.run(
             [HOST_BIN, "prove", "--inputs", str(inputs_path), "--out", str(out_dir)],
             capture_output=True, text=True, env=env,
         )
+        prove_seconds = round(time.monotonic() - t0, 1)
         if proc.returncode != 0:
             return {"error": f"host prove failed (exit {proc.returncode}): {proc.stderr[-800:]}"}
 
@@ -76,7 +86,16 @@ def handler(job):
 
         image_id_hex = (out_dir / "image_id.hex").read_text().strip()
         journal_hex = (out_dir / "journal.bin").read_bytes().hex()
-        return {"seal_hex": seal_hex, "image_id_hex": image_id_hex, "journal_hex": journal_hex}
+        # seal_hex/image_id_hex/journal_hex are what the RemoteProver consumes; gpu +
+        # prove_seconds are extra telemetry for Stop-A (the RemoteProver ignores them).
+        return {
+            "seal_hex": seal_hex,
+            "image_id_hex": image_id_hex,
+            "journal_hex": journal_hex,
+            "gpu": GPU_NAME,
+            "compute_cap": GPU_CC,
+            "prove_seconds": prove_seconds,
+        }
 
 
 _startup_gate()
