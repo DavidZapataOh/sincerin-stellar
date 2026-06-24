@@ -38,14 +38,19 @@ the bake can't use RunPod's GitHub builder (no DinD). The runtime image needs no
 Docker.
 
 ```bash
+# (the repo must be checked out at the target commit — `git clone -b sdd/s3-05`)
 # STAGE 1 — build the production host (image_id cbeab7aa, Docker guest build) and
 # VERIFY the embedded id before shipping. Needs Docker; no GPU needed to BUILD.
-GIT_SHA=$(git rev-parse HEAD) bash worker/build-host.sh     # → worker/dist/{host,risc0-home}
+bash worker/build-host.sh                                   # → worker/dist/{host,risc0-home}
 
 # STAGE 2 — slim runtime image that COPYs the prebuilt host (no toolchain, no Docker).
 docker build -t <dockerhub-user>/sincerin-prover:n8 worker/
 docker push  <dockerhub-user>/sincerin-prover:n8
 ```
+
+The recommended bake is the `bake-worker` GitHub Actions workflow ($0, real Docker,
+reproducible) — `.github/workflows/bake-worker.yml`, fired manually. It runs both
+stages and pushes to GHCR. A cheap x86 Docker VM works too (same commands above).
 
 `build-host.sh` runs `host execute` (fast, no GPU) and **aborts the build if the
 embedded image_id ≠ cbeab7aa** — so a wrong-guest image can never be shipped. The
