@@ -3,9 +3,10 @@
 //! **LOCK 1 (structural):** this binary builds with NO cargo features, so the
 //! `test-fixture` module — and therefore `FixtureProver` — is not even compiled
 //! here. The only provers reachable from production are `LocalProver` (real
-//! `host prove`, `RISC0_DEV_MODE=0`) and, in s3, `RemoteProver` (GPU). Backend
-//! selection is pure config (`PROVER_BACKEND=local|remote`); the sequencer's
-//! state machine, lock, and collision logic never change between them.
+//! `host prove`, `RISC0_DEV_MODE=0`) and `RemoteProver` (RunPod GPU, real
+//! `host prove`, s3/05). Backend selection is pure config
+//! (`PROVER_BACKEND=local|remote`); the sequencer's state machine, lock, and
+//! collision logic never change between them.
 //!
 //! Subcommands:
 //! - (default) — print the trust-boundary banner + selected backend.
@@ -21,7 +22,7 @@
 use std::path::PathBuf;
 
 use sequencer::pipeline::Config;
-use sequencer::prover::{LocalProver, Prover};
+use sequencer::prover::{LocalProver, Prover, RemoteProver};
 use sequencer::settler::{Settler, StellarCliSettler};
 
 fn workspace_root() -> PathBuf {
@@ -38,14 +39,20 @@ fn select_prover() -> Result<Box<dyn Prover>, String> {
     let backend = std::env::var("PROVER_BACKEND").unwrap_or_else(|_| "local".to_string());
     match backend.as_str() {
         "local" => Ok(Box::new(LocalProver::new(workspace_root()))),
-        "remote" => Err(
-            "PROVER_BACKEND=remote (GPU) is wired in s3 (RemoteProver); not built in this MVP. \
-             Use PROVER_BACKEND=local (real host prove)."
-                .to_string(),
-        ),
+        "remote" => {
+            // s3/05: the RunPod serverless GPU worker (real host prove, native CUDA).
+            let endpoint = std::env::var("RUNPOD_ENDPOINT_ID").map_err(|_| {
+                "RUNPOD_ENDPOINT_ID env required for PROVER_BACKEND=remote (the RunPod \
+                 serverless endpoint id)"
+                    .to_string()
+            })?;
+            let api_key = std::env::var("RUNPOD_API_KEY")
+                .map_err(|_| "RUNPOD_API_KEY env required for PROVER_BACKEND=remote".to_string())?;
+            Ok(Box::new(RemoteProver::new(endpoint, api_key)))
+        }
         other => Err(format!(
-            "unknown PROVER_BACKEND={other:?}; use 'local' (or 'remote' in s3). \
-             There is no fixture/dev-mode backend in the production binary."
+            "unknown PROVER_BACKEND={other:?}; use 'local' (real host prove) or 'remote' \
+             (RunPod GPU). There is no fixture/dev-mode backend in the production binary."
         )),
     }
 }

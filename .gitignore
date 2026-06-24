@@ -16,3 +16,8 @@ node_modules/
 # OS / editor
 .DS_Store
 *.swp
+
+# python bytecode (from py_compile syntax checks)
+worker/__pycache__/
+__pycache__/
+*.pyc
