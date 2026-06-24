@@ -30,9 +30,18 @@ set -euo pipefail
 ROOT="$(git rev-parse --show-toplevel)"
 EXPECTED_IMAGE_ID="cbeab7aa6ce69944e10cca8c7ed94d15aae297f2580752f07a15c6cab6ba0d46"
 mkdir -p "$ROOT/worker/dist"
+
+# Fail-fast gate: this build compiles CUDA kernels with `-arch=native`, which needs
+# an Ampere/Ada GPU PRESENT and reachable by Docker (--gpus all). A CPU machine (CI)
+# or a Dockerless pod CANNOT build this — abort in seconds with a clear message
+# instead of failing 40 min in. (Run scripts/vm_bake_sanity.sh for the full check.)
+docker run --rm hello-world >/dev/null 2>&1 || { echo "ERROR: no working Docker daemon — use a real VM (not a RunPod pod)."; exit 1; }
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1 \
+  || { echo "ERROR: no GPU reachable via 'docker --gpus all'. This build needs an Ampere/Ada GPU VM (e.g. AWS g5.xlarge), NOT CI/CPU. Run scripts/vm_bake_sanity.sh."; exit 1; }
+
 echo "Stage 1: building production host from $(git -C "$ROOT" rev-parse --short HEAD) (expect image_id $EXPECTED_IMAGE_ID)"
 
-docker run --rm \
+docker run --rm --gpus all \
   -e EXPECTED_IMAGE_ID="$EXPECTED_IMAGE_ID" \
   -v /var/run/docker.sock:/var/run/docker.sock \
   -v "$ROOT:$ROOT" -w "$ROOT" \

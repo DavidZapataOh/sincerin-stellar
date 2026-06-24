@@ -31,31 +31,43 @@ EVERY settle would fail. (See `methods/build.rs:41-48`.) The guest cycles — an
 the ~5min prove time — are identical either way; only the image_id build method
 differs.
 
-## Bake (TWO stages, on an x86 box WITH Docker — the author's Mac is ARM)
+## Bake on a GPU VM (~$0.50; CI/CPU can't — risc0 compiles CUDA with `-arch=native`)
 
-Producing cbeab7aa needs the `r0.1.88.0` Docker guest build (a Docker daemon), so
-the bake can't use RunPod's GitHub builder (no DinD). The runtime image needs no
-Docker.
+Two reasons the bake needs a **real GPU VM** (not CI, not a RunPod pod):
+1. Producing cbeab7aa needs the `r0.1.88.0` Docker guest build → a **real Docker daemon**
+   (a RunPod pod is a container with none).
+2. risc0's CUDA kernels compile with **`-arch=native`**, which needs an **Ampere/Ada GPU
+   PRESENT** (a CPU CI runner falls back to an unsupported arch → build fails). The VM
+   replicates the PARADA-1 box where the build already passes — no patching.
+
+So the bake **does** touch a GPU (~$0.50, bounded) — only to compile kernels, not to
+prove. **Recommended VM: AWS `g5.xlarge`** (A10G, sm_86 — same arch class as the 3090),
+**Ubuntu 22.04 Deep Learning Base GPU AMI** (Docker + CUDA + driver + nvidia-container-
+toolkit preinstalled), ≥60 GB disk. Billed per-second while running; **TERMINATE right
+after the push.**
 
 ```bash
-# (the repo must be checked out at the target commit — `git clone -b sdd/s3-05`)
-# STAGE 1 — build the production host (image_id cbeab7aa, Docker guest build) and
-# VERIFY the embedded id before shipping. Needs Docker; no GPU needed to BUILD.
-bash worker/build-host.sh                                   # → worker/dist/{host,risc0-home}
+# 0. ssh into the VM, then SANITY CHECK first (aborts in seconds if Docker/GPU are wrong):
+curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/sdd/s3-05/scripts/vm_bake_sanity.sh | bash
 
-# STAGE 2 — slim runtime image that COPYs the prebuilt host (no toolchain, no Docker).
-docker build -t <dockerhub-user>/sincerin-prover:n8 worker/
-docker push  <dockerhub-user>/sincerin-prover:n8
+# 1. clone the branch
+git clone -b sdd/s3-05 https://github.com/DavidZapataOh/sincerin-stellar.git && cd sincerin-stellar
+
+# 2. STAGE 1 — build the production host. Verifies image_id == cbeab7aa with `host execute`
+#    and ABORTS if it differs → a wrong-guest image can never be shipped.
+bash worker/build-host.sh                                    # → worker/dist/{host,risc0-home}
+
+# 3. STAGE 2 — slim runtime image (CUDA runtime + the host + groth16 artifacts + handler;
+#    NO toolchain, NO Docker at runtime). Push to GHCR (needs a GitHub PAT, scope write:packages).
+docker build -t ghcr.io/davidzapataoh/sincerin-prover:n8 worker/
+echo "$GHCR_PAT" | docker login ghcr.io -u davidzapataoh --password-stdin
+docker push ghcr.io/davidzapataoh/sincerin-prover:n8
+
+# 4. TERMINATE the VM NOW (AWS console → Instances → Terminate) → $0 after.
 ```
 
-The recommended bake is the `bake-worker` GitHub Actions workflow ($0, real Docker,
-reproducible) — `.github/workflows/bake-worker.yml`, fired manually. It runs both
-stages and pushes to GHCR. A cheap x86 Docker VM works too (same commands above).
-
-`build-host.sh` runs `host execute` (fast, no GPU) and **aborts the build if the
-embedded image_id ≠ cbeab7aa** — so a wrong-guest image can never be shipped. The
-runtime image is slim (CUDA runtime + the host binary + groth16 artifacts +
-handler); the prove runs native CUDA, no Docker.
+After the first push, make the GHCR package **public** (GitHub → Packages →
+`sincerin-prover` → settings → visibility: public) so RunPod pulls it without creds.
 
 ## RunPod serverless endpoint — REQUIRED guardrails (confirm BEFORE the first real job)
 
