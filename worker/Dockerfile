@@ -70,6 +70,10 @@ RUN cargo build --release -p host \
  && test -x target/release/host
 
 # ── 8) the RunPod serverless handler ──────────────────────────────────────────
-RUN pip3 install --no-cache-dir runpod
-COPY handler.py /sincerin/handler.py
-CMD ["python3", "-u", "/sincerin/handler.py"]
+# Use the handler from the pinned clone itself (worker/handler.py) — no build-
+# context dependency, so a RunPod GitHub build is reproducible from GIT_SHA alone.
+# NOTE: GIT_SHA must be a commit that HAS worker/ (i.e. the sdd/s3-05 tip) — it is
+# not on main until s3-05 merges.
+RUN pip3 install --no-cache-dir runpod \
+ && test -f /sincerin/worker/handler.py
+CMD ["python3", "-u", "/sincerin/worker/handler.py"]
