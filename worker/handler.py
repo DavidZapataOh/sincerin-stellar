@@ -21,7 +21,7 @@ import time
 
 import runpod
 
-HOST_BIN = "/sincerin/target/release/host"
+HOST_BIN = "/sincerin/host"  # the prebuilt production host (image_id cbeab7aa)
 
 # GPU identity, captured once at startup so Stop-A can see WHICH GPU ran (the
 # RunPod "24 GB" category bundles L4/A5000/3090; the 5min number is the 3090's).
@@ -67,7 +67,10 @@ def handler(job):
         out_dir.mkdir()
         inputs_path.write_text(json.dumps(inp))
 
-        env = dict(os.environ, RISC0_DEV_MODE="0", ROLLUP_LOCAL_GUEST="1")
+        # RISC0_DEV_MODE=0 = REAL proof. ROLLUP_LOCAL_GUEST is NOT set: it only
+        # affects the guest BUILD (build.rs), and the host here is the prebuilt
+        # production binary with the contract-bound image_id (cbeab7aa) embedded.
+        env = dict(os.environ, RISC0_DEV_MODE="0")
         t0 = time.monotonic()
         proc = subprocess.run(
             [HOST_BIN, "prove", "--inputs", str(inputs_path), "--out", str(out_dir)],

@@ -20,19 +20,37 @@ and returns the receipt. **Scale-to-zero: $0 when idle.**
   so the **dev-mode (`ffffffff`) and short-seal rejections apply identically** to
   local and remote. The handler ALSO refuses a dev-mode seal at the source.
 
-## Bake the image ONCE (x86 — the author's Mac is ARM, can't build this)
+## CRITICAL: the worker MUST produce image_id `cbeab7aa…0d46`
+
+The on-chain `settle_batch` binds the DEPLOYED guest image_id **cbeab7aa…0d46** (the
+reproducible `r0.1.88.0` Docker guest build) and reverts if a receipt's image_id
+differs. So the production host MUST be built **WITHOUT** `ROLLUP_LOCAL_GUEST` — that
+flag (used only to MEASURE latency in PARADA 1 on a Docker-less box) yields a
+different, path-dependent id (`3b0a6d14…`) that the contract would **reject** →
+EVERY settle would fail. (See `methods/build.rs:41-48`.) The guest cycles — and so
+the ~5min prove time — are identical either way; only the image_id build method
+differs.
+
+## Bake (TWO stages, on an x86 box WITH Docker — the author's Mac is ARM)
+
+Producing cbeab7aa needs the `r0.1.88.0` Docker guest build (a Docker daemon), so
+the bake can't use RunPod's GitHub builder (no DinD). The runtime image needs no
+Docker.
 
 ```bash
-# Pin the commit so the baked guest/image_id is reproducible.
-docker build --build-arg GIT_SHA=$(git rev-parse HEAD) \
-  -t <dockerhub-user>/sincerin-prover:n8 worker/
-docker push <dockerhub-user>/sincerin-prover:n8
+# STAGE 1 — build the production host (image_id cbeab7aa, Docker guest build) and
+# VERIFY the embedded id before shipping. Needs Docker; no GPU needed to BUILD.
+GIT_SHA=$(git rev-parse HEAD) bash worker/build-host.sh     # → worker/dist/{host,risc0-home}
+
+# STAGE 2 — slim runtime image that COPYs the prebuilt host (no toolchain, no Docker).
+docker build -t <dockerhub-user>/sincerin-prover:n8 worker/
+docker push  <dockerhub-user>/sincerin-prover:n8
 ```
 
-The image bakes PARADA-1 steps 1–7 (deps · rust · rzup+risc0-groth16 · cuda
-feature · **sppark 0.1.12 pin** · `host` built with the guest prebuilt). Runtime =
-just `host prove`. The build is heavy (compiles risc0 + CUDA kernels + guest);
-expect a multi-GB image and a 15–30 min build.
+`build-host.sh` runs `host execute` (fast, no GPU) and **aborts the build if the
+embedded image_id ≠ cbeab7aa** — so a wrong-guest image can never be shipped. The
+runtime image is slim (CUDA runtime + the host binary + groth16 artifacts +
+handler); the prove runs native CUDA, no Docker.
 
 ## RunPod serverless endpoint — REQUIRED guardrails (confirm BEFORE the first real job)
 

@@ -21,3 +21,6 @@ node_modules/
 worker/__pycache__/
 __pycache__/
 *.pyc
+
+# worker build artifacts (Stage 1 output — built on x86, not committed)
+worker/dist/
