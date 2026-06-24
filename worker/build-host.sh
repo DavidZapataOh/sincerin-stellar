@@ -52,9 +52,14 @@ docker run --rm \
     sed -i "s#risc0-zkvm\( *\)= { workspace = true }#risc0-zkvm\1= { workspace = true, features = [\"cuda\"] }#" host/Cargo.toml
     grep -q "features = \[\"cuda\"\]" host/Cargo.toml
     cargo fetch
+    # The ONLY pin needed is sppark 0.1.12 (0.1.15 → illegal memory access on GPU).
+    # sppark 0.1.12 does NOT depend on blst (its deps are cc + which) — so the old
+    # blst=0.3.15 "insurance" pin was unnecessary AND breaks resolution: c-kzg (via
+    # alloy ← risc0-ethereum-contracts, needed for encode_seal) requires blst ^0.3.16.
+    # Leave blst at the committed 0.3.16 (what the whole project already resolves to).
     cargo update -p sppark --precise 0.1.12
-    cargo update -p blst --precise 0.3.15
     grep -A1 "name = \"sppark\"" Cargo.lock | grep -q "\"0.1.12\""
+    grep -A1 "name = \"blst\"" Cargo.lock | grep -qE "\"0\.3\.(1[6-9]|[2-9][0-9])\"" || { echo "blst < 0.3.16 — c-kzg would reject"; exit 1; }
     # ── the production build: NO ROLLUP_LOCAL_GUEST → r0.1.88.0 Docker guest build
     #    (the nested docker run resolves $PWD on the host via the same-path mount).
     cargo build --release -p host

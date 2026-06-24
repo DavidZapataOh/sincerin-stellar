@@ -133,12 +133,14 @@ grep -n 'risc0-zkvm ' host/Cargo.toml | head -1
 # 6) Fijar la pila CUDA a lo que risc0 3.0.5 TESTEÓ (su Cargo.lock) ────────────
 #    La resolución fresca trae sppark 0.1.15, pero risc0 3.0.5 se testeó con 0.1.12.
 #    El drift → "illegal memory access" en sppark/gpu_t.cuh en runtime.
-#    risc0 v3.0.5 lock = sppark 0.1.12 / cust 0.3.2 / blst 0.3.15.
+#    El ÚNICO pin necesario es sppark 0.1.12. NO se pinea blst: sppark 0.1.12 no
+#    depende de blst (deps = cc + which), y c-kzg (vía alloy ← risc0-ethereum-
+#    contracts, para encode_seal) exige blst ^0.3.16 → forzar 0.3.15 rompería la
+#    resolución. Se deja blst en el 0.3.16 que resuelve todo el proyecto.
 log "6) Fijar sppark=0.1.12 (risc0 3.0.5 testeada; 0.1.15 → illegal memory access)"
 cargo fetch >/dev/null 2>&1 || true        # resuelve la feature cuda → sppark entra al lock
 cargo update -p sppark --precise 0.1.12 2>&1 | tail -3 || die "no pude fijar sppark 0.1.12 — pega el error."
 grep -A1 'name = "sppark"' Cargo.lock | grep -q '"0.1.12"' || die "sppark no quedó en 0.1.12 en el lock."
-cargo update -p blst --precise 0.3.15 2>&1 | tail -2 || echo "AVISO: no pude fijar blst 0.3.15 (insurance; el crash es sppark)."
 echo "pila cuda fijada:"; for c in sppark cust blst; do printf '  %-8s' "$c"; grep -A1 "name = \"$c\"" Cargo.lock | grep version | head -1 | tr -d ' '; done
 
 # 7) Build host (kernels CUDA + guest LOCAL sin Docker) — NO cronometrado ─────
