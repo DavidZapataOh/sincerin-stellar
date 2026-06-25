@@ -31,39 +31,43 @@ EVERY settle would fail. (See `methods/build.rs:41-48`.) The guest cycles — an
 the ~5min prove time — are identical either way; only the image_id build method
 differs.
 
-## Bake on a GPU VM (~$0.50; CI/CPU can't — risc0 compiles CUDA with `-arch=native`)
+## Bake on a cheap x86 CPU VM with Docker (NO GPU, no quota wall)
 
-Two reasons the bake needs a **real GPU VM** (not CI, not a RunPod pod):
-1. Producing cbeab7aa needs the `r0.1.88.0` Docker guest build → a **real Docker daemon**
-   (a RunPod pod is a container with none).
-2. risc0's CUDA kernels compile with **`-arch=native`**, which needs an **Ampere/Ada GPU
-   PRESENT** (a CPU CI runner falls back to an unsupported arch → build fails). The VM
-   replicates the PARADA-1 box where the build already passes — no patching.
+The bake needs a **real Docker daemon** (the reproducible `r0.1.88.0` guest build →
+cbeab7aa) but **NO GPU**: risc0's only build-time GPU dependency is `-arch=native`,
+which `worker/build-in-container.sh` neutralizes with an nvcc wrapper that forces
+`-arch=compute_86` (PTX → JITs on the 24GB serverless category at the prove). So the
+bake runs on **any cheap x86 VM with Docker** — instant, no GPU quota, you delete to
+stop. GPU-container providers (RunPod, Vast.ai) **don't work** (they're containers
+with no Docker daemon).
 
-So the bake **does** touch a GPU (~$0.50, bounded) — only to compile kernels, not to
-prove. **Recommended VM: AWS `g5.xlarge`** (A10G, sm_86 — same arch class as the 3090),
-**Ubuntu 22.04 Deep Learning Base GPU AMI** (Docker + CUDA + driver + nvidia-container-
-toolkit preinstalled), ≥60 GB disk. Billed per-second while running; **TERMINATE right
-after the push.**
+**Recommended VM:** Hetzner `CPX41` (8 vCPU / 16 GB / 240 GB, ~€0.05/hr) · DigitalOcean
+16 GB droplet (~$0.12/hr) · Linode. Ubuntu 22.04 or 24.04 (host OS doesn't matter — the
+build runs in a cuda:12.4.1 container). ≥16 GB RAM, ≥80 GB disk. Build ~30–45 min →
+**~$0.05–0.20**. Delete the VM after the push.
 
 ```bash
-# 0. ssh into the VM, then SANITY CHECK first (aborts in seconds if Docker/GPU are wrong):
+# 0. ssh into the VM. Install Docker if the image doesn't have it:
+curl -fsSL https://get.docker.com | sh
+
+# 1. SANITY — confirms a REAL Docker daemon (aborts in seconds if it's a container):
 curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/sdd/s3-05/scripts/vm_bake_sanity.sh | bash
 
-# 1. clone the branch
+# 2. clone the branch
 git clone -b sdd/s3-05 https://github.com/DavidZapataOh/sincerin-stellar.git && cd sincerin-stellar
 
-# 2. STAGE 1 — build the production host. Verifies image_id == cbeab7aa with `host execute`
-#    and ABORTS if it differs → a wrong-guest image can never be shipped.
+# 3. STAGE 1 — build the production host (no GPU). Verifies image_id == cbeab7aa with
+#    `host execute` and ABORTS if it differs → a wrong-guest image can never be shipped.
 bash worker/build-host.sh                                    # → worker/dist/{host,risc0-home}
 
-# 3. STAGE 2 — slim runtime image (CUDA runtime + the host + groth16 artifacts + handler;
-#    NO toolchain, NO Docker at runtime). Push to GHCR (needs a GitHub PAT, scope write:packages).
+# 4. STAGE 2 — slim runtime image (CUDA runtime + the host + groth16 artifacts + handler;
+#    NO toolchain, NO Docker at runtime). Push to GHCR (GitHub PAT, scope write:packages).
 docker build -t ghcr.io/davidzapataoh/sincerin-prover:n8 worker/
+export GHCR_PAT='ghp_...'
 echo "$GHCR_PAT" | docker login ghcr.io -u davidzapataoh --password-stdin
 docker push ghcr.io/davidzapataoh/sincerin-prover:n8
 
-# 4. TERMINATE the VM NOW (AWS console → Instances → Terminate) → $0 after.
+# 5. DELETE the VM (provider console) → $0 after.
 ```
 
 After the first push, make the GHCR package **public** (GitHub → Packages →
