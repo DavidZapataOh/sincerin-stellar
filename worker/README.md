@@ -48,10 +48,12 @@ reach Stop A *knowing* the kernels prove, instead of baking blind.
 > from an sm_86 VM.
 
 GPU-container providers (RunPod, Vast.ai) **don't work** — they're containers with no
-Docker daemon. Use a **real GPU VM with root**: **Paperspace Core** (A4000/A5000, sm_86)
-or a **3090 on-demand provider** (sm_86). Ubuntu 22.04/24.04 (host OS doesn't matter —
-the build runs in a cuda:12.4.1 container). ≥80 GB disk. Build + validation prove
-~35–50 min → **~$0.50–1**. Delete the VM after the push.
+Docker daemon. And AWS/GCP/Paperspace gate new-account GPU behind a 1–2 day manual
+approval. Use a **real GPU VM with root, self-serve, no approval**: **TensorDock** (KVM
+VMs, full root + Docker, instant, $5 min — RTX 3090 ~$0.31/hr or A5000, both sm_86) or
+**Trooper.AI** (EU, root-access GPU servers, RTX 3090 ~€0.23/hr, sm_86). Ubuntu 22.04/24.04
+(host OS doesn't matter — the build runs in a cuda:12.4.1 container). ≥80 GB disk. Build +
+validation prove ~35–50 min → **~$0.20–0.50**. Delete the VM after the push.
 
 ```bash
 # 0. ssh in. Install Docker + nvidia-container-toolkit if the image lacks them.
