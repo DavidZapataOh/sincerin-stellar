@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Runs INSIDE nvidia/cuda:12.4.1-devel-ubuntu22.04 (launched by worker/build-host.sh)
-# with the host Docker socket + the repo mounted at the same path. Builds the
-# PRODUCTION host (image_id cbeab7aa) WITHOUT a GPU by forcing a fixed CUDA arch.
+# with --gpus all + the host Docker socket + the repo mounted at the same path.
+# Builds the PRODUCTION host (image_id cbeab7aa) with NATIVE CUDA kernels for the
+# VM's GPU arch (PARADA-1 style — GPU present), then EXECUTES a real validation
+# prove on that GPU and refuses to ship unless it verifies. NO arch hack.
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 : "${EXPECTED_IMAGE_ID:?}"
@@ -12,28 +14,10 @@ apt-get update -y && apt-get install -y --no-install-recommends \
 export LIBCLANG_PATH=/usr/lib/llvm-14/lib
 ls "$LIBCLANG_PATH"/libclang*.so* >/dev/null
 
-# ── Force a fixed CUDA arch so kernels compile with NO GPU present (-arch=native
-#    needs one). Replace nvcc IN-PLACE with a wrapper that rewrites -arch=native →
-#    -arch=compute_86 (PTX-only → JITs at runtime on the 24GB serverless category:
-#    A5000/3090 sm_86, L4 sm_89). Catches every nvcc call (PATH, $NVCC, absolute).
-NVCC_REAL="$(command -v nvcc)"
-mv "$NVCC_REAL" "${NVCC_REAL}.real"
-cat > "$NVCC_REAL" <<EOF
-#!/bin/bash
-a=()
-for x in "\$@"; do
-  case "\$x" in
-    -arch=native|--gpu-architecture=native) a+=("-arch=compute_86") ;;
-    *) a+=("\$x") ;;
-  esac
-done
-exec "${NVCC_REAL}.real" "\${a[@]}"
-EOF
-chmod +x "$NVCC_REAL"
-echo "nvcc wrapper installed: -arch=native → -arch=compute_86 (no GPU needed to compile)"
+# the GPU must be visible in here (the outer `docker run --gpus all` provides it),
+# so -arch=native compiles SASS for THIS GPU's arch — the same arch we validate on.
+nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader
 
-# rust + RISC Zero toolchain (cargo-risczero/r0vm 3.0.5 + groth16; r0.1.88.0 guest
-# builder + risc0 =3.0.5 are pinned in build.rs / Cargo.toml → image_id cbeab7aa).
 curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 . "$HOME/.cargo/env"
 curl -L https://risczero.com/install | bash
@@ -50,20 +34,33 @@ cargo update -p sppark --precise 0.1.12
 grep -A1 'name = "sppark"' Cargo.lock | grep -q '"0.1.12"'
 grep -A1 'name = "blst"' Cargo.lock | grep -qE '"0\.3\.(1[6-9]|[2-9][0-9])"' || { echo "blst < 0.3.16 — c-kzg would reject"; exit 1; }
 
-# NO ROLLUP_LOCAL_GUEST → r0.1.88.0 Docker guest build (nested docker run resolves
-# $PWD on the host via the same-path mount) → image_id cbeab7aa.
+# NO ROLLUP_LOCAL_GUEST → r0.1.88.0 Docker guest build → image_id cbeab7aa.
+# -arch=native (GPU present) → SASS for this GPU's compute capability.
 cargo build --release -p host
 
-# verify the EMBEDDED image_id == the contract-bound one with `host execute`
-# (the CPU executor — FAST, no GPU). Abort BEFORE shipping if it differs.
+# (1) verify the EMBEDDED guest image_id (fast, no proving)
 IMG="$(./target/release/host execute --inputs golden/n8_inputs.json 2>&1 \
         | grep -i 'guest image-id' | grep -oiE '[a-f0-9]{64}' | head -1 || true)"
-if [ "$IMG" != "$EXPECTED_IMAGE_ID" ]; then
-  echo "FATAL: built guest image-id is $IMG, NOT the contract-bound $EXPECTED_IMAGE_ID."
-  echo "  → a worker with the wrong image_id has EVERY settle REJECTED on-chain. Aborting."
-  exit 1
-fi
-echo "OK: embedded guest image-id == $EXPECTED_IMAGE_ID (contract-bound)"
+[ "$IMG" = "$EXPECTED_IMAGE_ID" ] \
+  || { echo "FATAL: guest image-id $IMG != $EXPECTED_IMAGE_ID — aborting."; exit 1; }
+echo "OK: guest image-id == $EXPECTED_IMAGE_ID"
+
+# (2) VALIDATION PROVE — actually EXECUTE a real N=8 Groth16 prove on THIS GPU
+# (RISC0_DEV_MODE=0). This proves the CUDA kernels WORK, not just compile. Ship
+# ONLY if: a real seal (≠ ffffffff), receipt.verify(image_id) OK, image_id cbeab7aa.
+echo "VALIDATION PROVE (real N=8, RISC0_DEV_MODE=0, on this GPU) — ~5 min ..."
+rm -rf /tmp/val && mkdir -p /tmp/val
+RISC0_DEV_MODE=0 ./target/release/host prove --inputs golden/n8_inputs.json --out /tmp/val 2>&1 | tee /tmp/val.log
+grep -q 'receipt.verify(image_id): OK' /tmp/val.log \
+  || { echo "FATAL: validation prove did NOT verify on this GPU. NOT shipping a broken image."; exit 1; }
+VSEAL="$(cut -c1-8 /tmp/val/seal.hex)"
+[ "$VSEAL" != "ffffffff" ] \
+  || { echo "FATAL: dev-mode seal from the validation prove. NOT shipping."; exit 1; }
+VIMG="$(cat /tmp/val/image_id.hex)"
+[ "$VIMG" = "$EXPECTED_IMAGE_ID" ] \
+  || { echo "FATAL: validation prove image_id $VIMG != $EXPECTED_IMAGE_ID. NOT shipping."; exit 1; }
+echo "OK: VALIDATION PROVE PASSED — real Groth16 seal ($VSEAL…), receipt.verify OK, image_id cbeab7aa."
+echo "    → the kernels PROVE correctly on this GPU arch; production must use the SAME arch (single-arch endpoint category)."
 
 cp target/release/host worker/dist/host
 cp -r "$HOME/.risc0" worker/dist/risc0-home

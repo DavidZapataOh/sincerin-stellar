@@ -31,37 +31,43 @@ EVERY settle would fail. (See `methods/build.rs:41-48`.) The guest cycles — an
 the ~5min prove time — are identical either way; only the image_id build method
 differs.
 
-## Bake on a cheap x86 CPU VM with Docker (NO GPU, no quota wall)
+## Bake on a real GPU VM, with a VALIDATION PROVE before push (~$0.50–1)
 
 The bake needs a **real Docker daemon** (the reproducible `r0.1.88.0` guest build →
-cbeab7aa) but **NO GPU**: risc0's only build-time GPU dependency is `-arch=native`,
-which `worker/build-in-container.sh` neutralizes with an nvcc wrapper that forces
-`-arch=compute_86` (PTX → JITs on the 24GB serverless category at the prove). So the
-bake runs on **any cheap x86 VM with Docker** — instant, no GPU quota, you delete to
-stop. GPU-container providers (RunPod, Vast.ai) **don't work** (they're containers
-with no Docker daemon).
+cbeab7aa) **and a GPU**: `-arch=native` compiles the CUDA kernels for the VM's GPU
+arch (PARADA-1 style, no hack), and — the key safety — `build-host.sh` then runs a
+**REAL N=8 prove on the VM's GPU** and refuses to ship unless it verifies. So you
+reach Stop A *knowing* the kernels prove, instead of baking blind.
 
-**Recommended VM:** Hetzner `CPX41` (8 vCPU / 16 GB / 240 GB, ~€0.05/hr) · DigitalOcean
-16 GB droplet (~$0.12/hr) · Linode. Ubuntu 22.04 or 24.04 (host OS doesn't matter — the
-build runs in a cuda:12.4.1 container). ≥16 GB RAM, ≥80 GB disk. Build ~30–45 min →
-**~$0.05–0.20**. Delete the VM after the push.
+> **Single-arch rule (covers the L4 gap):** native CUDA SASS is per compute-capability
+> — an sm_86 build runs on sm_86 GPUs only, NOT sm_89 (L4). So set the serverless
+> endpoint to a **single-arch category** matching the bake GPU, and the validation
+> prove covers production EXACTLY. Bake on an **sm_86** GPU → endpoint category
+> **"A6000, A40 (48 GB)"** (both sm_86). Do NOT use the mixed "L4, A5000, 3090 (24 GB)"
+> category — its L4 (sm_89) wouldn't run the sm_86 build, and you can't validate it
+> from an sm_86 VM.
+
+GPU-container providers (RunPod, Vast.ai) **don't work** — they're containers with no
+Docker daemon. Use a **real GPU VM with root**: **Paperspace Core** (A4000/A5000, sm_86)
+or a **3090 on-demand provider** (sm_86). Ubuntu 22.04/24.04 (host OS doesn't matter —
+the build runs in a cuda:12.4.1 container). ≥80 GB disk. Build + validation prove
+~35–50 min → **~$0.50–1**. Delete the VM after the push.
 
 ```bash
-# 0. ssh into the VM. Install Docker if the image doesn't have it:
-curl -fsSL https://get.docker.com | sh
+# 0. ssh in. Install Docker + nvidia-container-toolkit if the image lacks them.
 
-# 1. SANITY — confirms a REAL Docker daemon (aborts in seconds if it's a container):
+# 1. SANITY — Docker daemon + Ampere/Ada GPU + docker --gpus all (aborts in seconds):
 curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/sdd/s3-05/scripts/vm_bake_sanity.sh | bash
 
-# 2. clone the branch
+# 2. clone
 git clone -b sdd/s3-05 https://github.com/DavidZapataOh/sincerin-stellar.git && cd sincerin-stellar
 
-# 3. STAGE 1 — build the production host (no GPU). Verifies image_id == cbeab7aa with
-#    `host execute` and ABORTS if it differs → a wrong-guest image can never be shipped.
+# 3. STAGE 1 — build (native kernels) + VALIDATION PROVE on the GPU. Verifies image_id
+#    == cbeab7aa AND runs a real prove (seal ≠ ffffffff, receipt.verify OK). ABORTS
+#    before shipping if anything fails → no broken image reaches GHCR.
 bash worker/build-host.sh                                    # → worker/dist/{host,risc0-home}
 
-# 4. STAGE 2 — slim runtime image (CUDA runtime + the host + groth16 artifacts + handler;
-#    NO toolchain, NO Docker at runtime). Push to GHCR (GitHub PAT, scope write:packages).
+# 4. STAGE 2 — slim runtime image + push to GHCR (GitHub PAT, scope write:packages).
 docker build -t ghcr.io/davidzapataoh/sincerin-prover:n8 worker/
 export GHCR_PAT='ghp_...'
 echo "$GHCR_PAT" | docker login ghcr.io -u davidzapataoh --password-stdin
@@ -75,18 +81,20 @@ After the first push, make the GHCR package **public** (GitHub → Packages →
 
 ## RunPod serverless endpoint — REQUIRED guardrails (confirm BEFORE the first real job)
 
-> **GPU selection is by VRAM CATEGORY, not exact model** (RunPod docs). The 3090
-> lives in the category **"L4, A5000, 3090 (24 GB)"** — selecting it means the
-> worker may run on L4, A5000, OR RTX 3090. All three are Ampere/Ada, CUDA-12.4
-> compatible, **NONE is Blackwell** (B200 is its own unselected category). Select
-> ONLY this one category → no fallback to others → the worker can NEVER touch
-> Blackwell. The handler's runtime gate is the final backstop.
+> **GPU selection is by VRAM CATEGORY, not exact model** (RunPod docs), and native
+> CUDA SASS is per compute-capability. So the endpoint category MUST be **single-arch
+> AND match the arch the host was built+validated on** — otherwise a different-arch
+> GPU in a mixed category (e.g. the L4 sm_89 in "L4, A5000, 3090 (24 GB)") can't run
+> an sm_86 build, and it reverts at prove time. For an **sm_86** build, the matching
+> single-arch category is **"A6000, A40 (48 GB)"** (both sm_86). None is Blackwell;
+> the handler's runtime gate is the final backstop.
 
 Create a Serverless endpoint from the pushed image with, explicitly:
 
-- [ ] **GPU category: ONLY "L4, A5000, 3090 (24 GB)"** — no other category selected
-      (so there is no fallback to a non-compatible GPU). The actual GPU per job is
-      reported in the output (`gpu`); a 3090 is the direct PARADA-1 comparison.
+- [ ] **GPU category: ONLY a single-arch category matching the bake arch** — for an
+      sm_86 build, **"A6000, A40 (48 GB)"** (both sm_86). NOT the mixed "L4, A5000,
+      3090 (24 GB)" (its L4 is sm_89). No other category selected (no fallback). The
+      validation prove ran on this exact arch, so production is covered.
 - [ ] **(if available) Allowed CUDA version ≥ 12.4** — extra host-driver guard.
 - [ ] **Active (min) workers = 0** → **$0 when idle** (scale-to-zero). No always-on.
 - [ ] **Max workers = 1–2** → a runaway can't fan out.
