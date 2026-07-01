@@ -39,8 +39,10 @@ use methods::{
     ROLLUP_GUEST_BENCH_ELF, ROLLUP_GUEST_BENCH_ID, ROLLUP_GUEST_ELF, ROLLUP_GUEST_ID,
 };
 use risc0_ethereum_contracts::encode_seal;
+use risc0_zkvm::sha::Digestible;
 use risc0_zkvm::{
-    default_executor, default_prover, Digest, ExecutorEnv, InnerReceipt, ProverOpts, Receipt,
+    default_executor, default_prover, Digest, ExecutorEnv, Groth16Receipt, InnerReceipt,
+    MaybePruned, ProverOpts, Receipt, ReceiptClaim, VerifierContext,
 };
 use serde::Deserialize;
 use zk_core::journal::{self, DecodedJournal};
@@ -53,6 +55,11 @@ use zk_core::witness::{GuestInput, NoteWitness};
 const GOLDEN_N2: &str = "golden/n2_inputs.json";
 /// Output directory for the serialized receipt artifacts (default).
 const RECEIPT_DIR: &str = "out/receipt";
+/// The verifier selector the DEPLOYED Soroban CBQF verifier accepts: the first 4
+/// bytes of this build's risc0-3.0.5 Groth16 verifier-parameters digest (control
+/// root + BN254 control id + verifying key). A settle-able seal MUST carry it.
+/// Matches the known-good local seals in `out/receipt` and `out/bench/n8`.
+const DEPLOYED_SELECTOR: &str = "73c457ba";
 /// The DEPLOYED guest's depth (image_id cbeab7aa…); depth-3 inputs settle here.
 const DEPLOYED_TREE_DEPTH: usize = 3;
 
@@ -560,6 +567,130 @@ fn usage() -> &'static str {
      depth 3 inputs use the DEPLOYED guest (cbeab7aa…); depth 4/5 use the proving-only bench guest (build with ROLLUP_TREE_DEPTH=<depth>)."
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// verify-external — CROSS-CHECK an externally-produced Groth16 (seal, journal)
+// against the DEPLOYED image_id, WITHOUT re-proving. The BLOQUEANTE gate for
+// adopting a third-party prover (e.g. Boundless): reconstruct a risc0 Groth16
+// receipt from raw (seal, journal) using THIS build's 3.0.5 verifier parameters,
+// verify it against cbeab7aa, and confirm `encode_seal` yields the deployed CBQF
+// selector. Both pass ⇒ the external proof is a drop-in for settle_batch (no
+// Soroban change). Rejects dev-mode (0xffffffff) and non-Groth16 shapes, exactly
+// like the sequencer's build_proved_batch — cero-mocks.
+// ═════════════════════════════════════════════════════════════════════════════
+fn run_verify_external(
+    seal_path: &str,
+    journal_path: &str,
+    image_id_hex: Option<String>,
+) -> Result<(), String> {
+    // Target image id: default the DEPLOYED cbeab7aa (what settle_batch binds).
+    let id: Digest = match image_id_hex {
+        Some(h) => {
+            let bytes = hex::decode(h.trim().trim_start_matches("0x"))
+                .map_err(|e| format!("--image-id not hex: {e}"))?;
+            Digest::try_from(bytes.as_slice())
+                .map_err(|_| "--image-id must be 32 bytes".to_string())?
+        }
+        None => Digest::from(ROLLUP_GUEST_ID),
+    };
+    println!("[xcheck] target image_id   0x{}", hex::encode(id.as_bytes()));
+
+    // Load the external seal (hex) + journal (raw bytes).
+    let seal_hex = fs::read_to_string(resolve(seal_path))
+        .map_err(|e| format!("read seal {seal_path}: {e}"))?;
+    let seal_all =
+        hex::decode(seal_hex.trim()).map_err(|e| format!("{seal_path} is not hex: {e}"))?;
+    let journal =
+        fs::read(resolve(journal_path)).map_err(|e| format!("read journal {journal_path}: {e}"))?;
+    println!(
+        "[xcheck] seal {} bytes · journal {} bytes",
+        seal_all.len(),
+        journal.len()
+    );
+
+    // ── Dev-mode + shape rejection (same defense as build_proved_batch). ──────
+    if seal_all.len() >= 4 && seal_all[..4] == [0xFFu8; 4] {
+        return Err("seal selector is 0xffffffff — a DEV-MODE fake seal. Refusing (cero-mocks).".into());
+    }
+    // 260 = 4-byte selector + 256-byte Groth16 (encode_seal form); 256 = raw Groth16.
+    let (input_selector, raw_seal): (Option<Vec<u8>>, Vec<u8>) = match seal_all.len() {
+        260 => (Some(seal_all[..4].to_vec()), seal_all[4..].to_vec()),
+        256 => (None, seal_all.clone()),
+        n => {
+            return Err(format!(
+                "seal is {n} bytes; expected 260 (selector+Groth16) or 256 (raw Groth16). Refusing."
+            ))
+        }
+    };
+    if raw_seal.len() != 256 {
+        return Err(format!("raw Groth16 must be 256 bytes, got {}", raw_seal.len()));
+    }
+    match &input_selector {
+        Some(s) => println!("[xcheck] input selector    {}", hex::encode(s)),
+        None => println!("[xcheck] input seal is RAW Groth16 (no selector prefix)"),
+    }
+
+    // ── This build's risc0-3.0.5 Groth16 verifier parameters (control root+vk). ─
+    let ctx = VerifierContext::default();
+    let vp = ctx
+        .groth16_verifier_parameters
+        .clone()
+        .ok_or_else(|| "default VerifierContext has no Groth16 params".to_string())?;
+    let vp_digest = vp.digest();
+    let our_selector = hex::encode(&vp_digest.as_bytes()[..4]);
+    println!("[xcheck] this-build selector {our_selector}  (risc0 3.0.5 Groth16 params)");
+    // Self-check: this build must still match the DEPLOYED verifier's selector.
+    if our_selector != DEPLOYED_SELECTOR {
+        return Err(format!(
+            "this build's Groth16 selector {our_selector} != deployed {DEPLOYED_SELECTOR} — \
+             the host's risc0 no longer matches the on-chain verifier; harness invalid."
+        ));
+    }
+
+    // ── Reconstruct a Groth16Receipt and VERIFY it against the image_id. ───────
+    let claim = ReceiptClaim::ok(id, journal.clone());
+    let g = Groth16Receipt::new(raw_seal, MaybePruned::Value(claim), vp_digest);
+    let receipt = Receipt::new(InnerReceipt::Groth16(g), journal.clone());
+
+    // CRITERION 1 — the Groth16 verifies against (cbeab7aa, journal) under our params.
+    match receipt.verify(id) {
+        Ok(()) => println!(
+            "[xcheck] CRITERION 1 ✓  receipt.verify(image_id) OK — Groth16 valid for \
+             this image_id + journal under risc0-3.0.5 params"
+        ),
+        Err(e) => {
+            return Err(format!(
+                "CRITERION 1 ✗  receipt.verify FAILED: {e}\n         → the external Groth16 does \
+                 NOT verify against this image_id with risc0-3.0.5 params. Either the prover used \
+                 a DIFFERENT circuit version (control root / verifying key), or journal/image_id \
+                 mismatch. It would NOT settle on-chain as-is."
+            ))
+        }
+    }
+
+    // CRITERION 2 — encode_seal reproduces the DEPLOYED selector (settle-ready).
+    let encoded = encode_seal(&receipt).map_err(|e| format!("encode_seal: {e}"))?;
+    let enc_selector = hex::encode(&encoded[..encoded.len().min(4)]);
+    if encoded.len() != 260 || enc_selector != DEPLOYED_SELECTOR {
+        return Err(format!(
+            "CRITERION 2 ✗  encoded seal is {} bytes, selector {enc_selector} (want 260 / \
+             {DEPLOYED_SELECTOR}) — the Soroban CBQF verifier would reject it (needs a \
+             verifier-params update on-chain).",
+            encoded.len()
+        ));
+    }
+    println!("[xcheck] CRITERION 2 ✓  encode_seal → 260 bytes, selector {enc_selector} == deployed");
+
+    println!(
+        "\n[xcheck] ✅ PASS — external (seal, journal) verifies against 0x{} AND encodes to the \
+         deployed selector.\n[xcheck]    settle-ready seal: {}…{} ({} bytes)",
+        hex::encode(id.as_bytes()),
+        hex::encode(&encoded[..8]),
+        hex::encode(&encoded[encoded.len() - 4..]),
+        encoded.len()
+    );
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(String::as_str);
@@ -604,6 +735,19 @@ fn main() -> ExitCode {
             let image_id_hex = hex::encode(Digest::from(ROLLUP_GUEST_ID).as_bytes());
             println!("{image_id_hex}");
             Ok(())
+        }
+        Some("verify-external") => {
+            // Cross-check an external (seal, journal) against the deployed image_id.
+            let seal = flag_value(rest, "--seal");
+            let journal = flag_value(rest, "--journal");
+            let image_id = flag_value(rest, "--image-id");
+            match (seal, journal) {
+                (Some(seal), Some(journal)) => run_verify_external(&seal, &journal, image_id),
+                _ => Err(format!(
+                    "verify-external requires --seal <hex> --journal <bin> [--image-id <hex>]\n\n{}",
+                    usage()
+                )),
+            }
         }
         other => Err(format!("unknown subcommand {:?}\n\n{}", other.unwrap_or("<none>"), usage())),
     };
