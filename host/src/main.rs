@@ -691,6 +691,94 @@ fn run_verify_external(
     Ok(())
 }
 
+// ═════════════════════════════════════════════════════════════════════════════
+// emit-input — serialize a GuestInput to the EXACT stdin blob the guest reads.
+// `ExecutorEnv::write(&data)` is literally `write_slice(&to_vec(data))`, and
+// `write_slice` casts the u32 words to LE bytes into the guest stdin. So the blob
+// is `to_vec(&input)` as LE bytes — byte-identical to the host's internal buffer
+// by construction. We then PROVE it by executing: the journal from the emitted
+// blob (write_slice path, what Boundless receives) must equal the journal from the
+// typed `write(&input)` path (the normal host path). Guest reads one value:
+// `let input: GuestInput = env::read();`.
+// ═════════════════════════════════════════════════════════════════════════════
+fn run_emit_input(inputs: &str, out: &str) -> Result<(), String> {
+    let path = resolve(inputs);
+    let (input, depth) = load_inputs(&path)?;
+    let (elf, id, which) = guest_for_depth(depth)?;
+    println!(
+        "[emit-input] loaded {} note(s) (depth {depth}) from {} → guest {which}",
+        input.notes.len(),
+        path.display()
+    );
+
+    // Serialize EXACTLY as ExecutorEnv::write does: words = to_vec(&input); the
+    // guest stdin is those words as little-endian bytes.
+    let words = risc0_zkvm::serde::to_vec(&input)
+        .map_err(|e| format!("serde::to_vec(GuestInput): {e}"))?;
+    let bytes: Vec<u8> = words.iter().flat_map(|w| w.to_le_bytes()).collect();
+    let out_path = resolve(out);
+    if let Some(parent) = out_path.parent() {
+        fs::create_dir_all(parent).ok();
+    }
+    fs::write(&out_path, &bytes).map_err(|e| format!("write {}: {e}", out_path.display()))?;
+    println!(
+        "[emit-input] wrote {} bytes ({} u32 words) to {}",
+        bytes.len(),
+        words.len(),
+        out_path.display()
+    );
+
+    // ── VALIDATION: byte-identity to ExecutorEnv::write, proven by execution. ──
+    // A (typed): env.write(&input) — the exact normal host path.
+    let env_a = ExecutorEnv::builder()
+        .write(&input)
+        .map_err(|e| format!("env A write: {e}"))?
+        .build()
+        .map_err(|e| format!("env A build: {e}"))?;
+    let journal_a = default_executor()
+        .execute(env_a, elf)
+        .map_err(|e| format!("execute A: {e}"))?
+        .journal
+        .bytes;
+    // B (from the emitted blob): reconstruct words, write_slice — what Boundless
+    // receives as the guest stdin. Must execute to the SAME journal.
+    let words_b: Vec<u32> = bytes
+        .chunks_exact(4)
+        .map(|c| u32::from_le_bytes([c[0], c[1], c[2], c[3]]))
+        .collect();
+    let env_b = ExecutorEnv::builder()
+        .write_slice(&words_b)
+        .build()
+        .map_err(|e| format!("env B build: {e}"))?;
+    let journal_b = default_executor()
+        .execute(env_b, elf)
+        .map_err(|e| format!("execute B: {e}"))?
+        .journal
+        .bytes;
+
+    if journal_a != journal_b {
+        return Err(
+            "byte-identity FAILED: journal from the emitted blob != journal from \
+             ExecutorEnv::write(&input). DO NOT send this blob to Boundless."
+                .into(),
+        );
+    }
+    println!(
+        "[emit-input] ✓ byte-identity VALIDATED — executor journal from the blob == from \
+         ExecutorEnv::write(&input)"
+    );
+    println!(
+        "[emit-input]   journal {} bytes · guest image-id 0x{}",
+        journal_a.len(),
+        hex::encode(Digest::from(id).as_bytes())
+    );
+    println!(
+        "[emit-input] → this is the guest stdin. Boundless wraps it in its Input envelope \
+         (see the order guide)."
+    );
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let cmd = args.first().map(String::as_str);
@@ -735,6 +823,18 @@ fn main() -> ExitCode {
             let image_id_hex = hex::encode(Digest::from(ROLLUP_GUEST_ID).as_bytes());
             println!("{image_id_hex}");
             Ok(())
+        }
+        Some("emit-input") => {
+            // Serialize a GuestInput to the exact stdin blob (for a remote prover).
+            let inputs = flag_value(rest, "--inputs");
+            let out = flag_value(rest, "--out");
+            match (inputs, out) {
+                (Some(inputs), Some(out)) => run_emit_input(&inputs, &out),
+                _ => Err(format!(
+                    "emit-input requires --inputs <json> --out <bin>\n\n{}",
+                    usage()
+                )),
+            }
         }
         Some("verify-external") => {
             // Cross-check an external (seal, journal) against the deployed image_id.
