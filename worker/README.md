@@ -54,8 +54,15 @@ approval. Use a **real GPU VM with root, self-serve, no approval**, billed **hou
 - **BitLaunch** (pays in **crypto**: BTC/LTC/ETH) — KVM VM on Vultr, full root + Docker,
   hourly, instant, no KYC. GPU: **NVIDIA A40 = sm_86**, which IS one of the two GPUs in the
   production endpoint category **"A6000, A40 (48 GB)"** → you validate on the *exact*
-  production model. Pick the **full A40 (48 GB)** or a **≥16 GB slice** (the prove needs
-  ~8 GB; the 8 GB slice is too tight). Full A40 ~$1.7/hr → a ~45–60 min bake ≈ **$1.3–2**.
+  production model. **In Create Server you MUST switch the provider to `Vultr`** — the
+  default "Cloud CPU — Intel VPS" is BitLaunch's own CPU-only hardware and shows NO GPU. After
+  selecting Vultr + a GPU-capable region, the **Cloud GPU / A40** plans appear. Pick the
+  **full A40 (48 GB)** or a **≥16 GB slice** (the prove needs ~8 GB; the 8 GB slice is too
+  tight). Full A40 ~$1.7/hr → a ~45–60 min bake ≈ **$1.3–2**. *If no A40 shows even under
+  Vultr → out of stock in that region (try another) or use HostKey below.*
+- **HostKey** (crypto: BTC) — real VDS/VPS with root + Docker, **hourly** GPU VPS, deployed
+  ~15 min. GPU: **RTX A4000 (16 GB) / A5000 (24 GB) / A6000 — all sm_86**. Use the *instant
+  GPU VPS* (NOT the "dedicated GPU server", which takes ~1 workday). A4000/A5000 is plenty.
 - **TensorDock** (card, $5 min) — KVM VMs, RTX 3090 ~$0.31/hr or A5000 (sm_86). *Marketplace;
   check host stock (was down for days in mid-2026).*
 - **Avoid monthly-only VPS hosts** for a throwaway bake — e.g. **Crunchbits** is a real VM +
