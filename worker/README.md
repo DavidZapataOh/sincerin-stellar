@@ -60,11 +60,17 @@ approval. Use a **real GPU VM with root, self-serve, no approval**, billed **hou
   **full A40 (48 GB)** or a **≥16 GB slice** (the prove needs ~8 GB; the 8 GB slice is too
   tight). Full A40 ~$1.7/hr → a ~45–60 min bake ≈ **$1.3–2**. *If no A40 shows even under
   Vultr → out of stock in that region (try another) or use HostKey below.*
-- **HostKey** (crypto: BTC) — real VDS/VPS with root + Docker, **hourly** GPU VPS, deployed
-  ~15 min. GPU: **RTX A4000 (16 GB) / A5000 (24 GB) / A6000 — all sm_86**. Use the *instant
-  GPU VPS* (NOT the "dedicated GPU server", which takes ~1 workday). A4000/A5000 is plenty.
-- **TensorDock** (card, $5 min) — KVM VMs, RTX 3090 ~$0.31/hr or A5000 (sm_86). *Marketplace;
-  check host stock (was down for days in mid-2026).*
+- **Cherry Servers** (EVM: **USDC on ETH/Polygon/Base/Arbitrum/Optimism + ETH**, no-KYC for
+  crypto) — **bare-metal, zero virtualization, root** (Docker native — ideal for the guest
+  build), **hourly**. GPU: **A40 (sm_86, 48 GB = the exact endpoint GPU)** or A10 (sm_86,
+  24 GB). ⚠️ **NOT the A100** — it's sm_80, would NOT run on the sm_86 endpoint. ⚠️ **GPU
+  provisioning is 24–72 h** (not instant; the "12-min deploy" is non-GPU only). Cleanest EVM
+  path if you can wait a day.
+- **HostKey** (crypto incl. **ETH/USDC/USDT ERC-20** via BitPay) — real VDS/VPS root + Docker,
+  **hourly** GPU VPS (~15 min), RTX A4000/A5000/A6000 (sm_86). ⚠️ **BitPay requires KYC**
+  ("anonymous crypto not accepted") — a verification wall; use only if you'll pass KYC.
+- **TensorDock** (card + crypto, $5 min) — KVM VMs, RTX 3090 ~$0.31/hr or A5000 (sm_86).
+  *Marketplace; check host stock (was down for days in mid-2026).*
 - **Avoid monthly-only VPS hosts** for a throwaway bake — e.g. **Crunchbits** is a real VM +
   crypto + sm_86, but billed **monthly with NO refunds**, so a 1-hour bake costs a full
   ~$65 month.

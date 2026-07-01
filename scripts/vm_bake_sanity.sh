@@ -6,10 +6,10 @@
 # it needs a GPU + a real Docker daemon.
 #
 # Checks: (a) real Docker daemon (a RunPod/Vast container has NONE), (b) x86_64,
-# (c) Ampere/Ada GPU (sm_8x; NOT Blackwell), (d) docker --gpus all reaches it,
-# (e) driver CUDA ≥ 12.4. Prints the GPU arch — your serverless endpoint MUST be a
-# SINGLE-ARCH category matching it (sm_86 → "A6000, A40 (48 GB)"; sm_89 → a 4090/L40
-# category), so the validation prove covers production exactly.
+# (c) an sm_86 GPU — CC 8.6 EXACTLY (A4000/A5000/A6000/A40/A10 or RTX 3090); NOT A100
+# (sm_80), NOT L4/4090 (sm_89), NOT Blackwell, (d) docker --gpus all reaches it,
+# (e) driver CUDA ≥ 12.4. The deployed endpoint is LOCKED to "A6000, A40 (48 GB)" = sm_86,
+# and native SASS is per-CC, so the bake GPU MUST be CC 8.6 or production won't run.
 #
 #   curl -fsSL https://raw.githubusercontent.com/DavidZapataOh/sincerin-stellar/sdd/s3-05/scripts/vm_bake_sanity.sh | bash
 # ─────────────────────────────────────────────────────────────────────────────
@@ -37,8 +37,8 @@ CC="$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader 2>/dev/null | hea
 MAJ="${CC%%.*}"
 echo "  GPU: ${NAME:-?} (compute cap $CC = sm_${CC/./})"
 [ "${MAJ:-0}" -ge 10 ] && die "Blackwell (CC $CC): risc0 3.0.5 + sppark 0.1.12 + CUDA 12.4 do NOT support it."
-[ "${MAJ:-0}" -ne 8 ] && die "GPU is CC $CC, not Ampere/Ada (sm_80–89). Pick A5000/A4000/3090 (sm_86) or 4090/L4 (sm_89)."
-ok "Ampere/Ada GPU (sm_${CC/./})"
+[ "$CC" != "8.6" ] && die "GPU is CC $CC (sm_${CC/./}), but the endpoint is LOCKED to sm_86 (A6000/A40). SASS is per-CC: an A100 (sm_80) or L4/4090 (sm_89) build would NOT run on the sm_86 endpoint. Bake on a CC 8.6 card: A4000/A5000/A6000/A40/A10 or RTX 3090."
+ok "sm_86 GPU (CC 8.6) — matches the A6000/A40 endpoint exactly"
 
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi >/dev/null 2>&1 \
   || die "docker --gpus all can't reach the GPU — install/enable nvidia-container-toolkit."
@@ -50,5 +50,5 @@ DRV_CUDA="$(nvidia-smi 2>/dev/null | grep -oiE 'CUDA Version: [0-9]+\.[0-9]+' | 
   || echo "  (could not read driver CUDA — must be ≥ 12.4)"
 
 echo ""
-printf '  \033[32mVM QUALIFIES\033[0m (sm_%s). Set the serverless endpoint to a SINGLE-ARCH category for sm_%s.\n' "${CC/./}" "${CC/./}"
+printf '  \033[32mVM QUALIFIES\033[0m (sm_86). Endpoint category: "A6000, A40 (48 GB)" — same arch, covered exactly.\n'
 printf '  Then: git clone -b sdd/s3-05 … && bash worker/build-host.sh\n'
