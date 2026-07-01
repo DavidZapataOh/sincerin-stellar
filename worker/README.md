@@ -49,11 +49,21 @@ reach Stop A *knowing* the kernels prove, instead of baking blind.
 
 GPU-container providers (RunPod, Vast.ai) **don't work** — they're containers with no
 Docker daemon. And AWS/GCP/Paperspace gate new-account GPU behind a 1–2 day manual
-approval. Use a **real GPU VM with root, self-serve, no approval**: **TensorDock** (KVM
-VMs, full root + Docker, instant, $5 min — RTX 3090 ~$0.31/hr or A5000, both sm_86) or
-**Trooper.AI** (EU, root-access GPU servers, RTX 3090 ~€0.23/hr, sm_86). Ubuntu 22.04/24.04
-(host OS doesn't matter — the build runs in a cuda:12.4.1 container). ≥80 GB disk. Build +
-validation prove ~35–50 min → **~$0.20–0.50**. Delete the VM after the push.
+approval. Use a **real GPU VM with root, self-serve, no approval**, billed **hourly**:
+
+- **BitLaunch** (pays in **crypto**: BTC/LTC/ETH) — KVM VM on Vultr, full root + Docker,
+  hourly, instant, no KYC. GPU: **NVIDIA A40 = sm_86**, which IS one of the two GPUs in the
+  production endpoint category **"A6000, A40 (48 GB)"** → you validate on the *exact*
+  production model. Pick the **full A40 (48 GB)** or a **≥16 GB slice** (the prove needs
+  ~8 GB; the 8 GB slice is too tight). Full A40 ~$1.7/hr → a ~45–60 min bake ≈ **$1.3–2**.
+- **TensorDock** (card, $5 min) — KVM VMs, RTX 3090 ~$0.31/hr or A5000 (sm_86). *Marketplace;
+  check host stock (was down for days in mid-2026).*
+- **Avoid monthly-only VPS hosts** for a throwaway bake — e.g. **Crunchbits** is a real VM +
+  crypto + sm_86, but billed **monthly with NO refunds**, so a 1-hour bake costs a full
+  ~$65 month.
+
+Ubuntu 22.04/24.04 (host OS doesn't matter — the build runs in a cuda:12.4.1 container).
+≥80 GB disk. Delete the VM after the push.
 
 ```bash
 # 0. ssh in. Install Docker + nvidia-container-toolkit if the image lacks them.

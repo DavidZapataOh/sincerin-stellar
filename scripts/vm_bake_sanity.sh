@@ -15,7 +15,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 ok(){ printf '  \033[32m✓\033[0m %s\n' "$*"; }
-die(){ printf '\n  \033[31m✗ %s\033[0m\n  → this machine does NOT qualify. Use a real GPU VM with root + Docker (TensorDock or Trooper.AI: KVM VMs, root, self-serve sm_86) — NOT a RunPod/Vast container.\n' "$*" >&2; exit 1; }
+die(){ printf '\n  \033[31m✗ %s\033[0m\n  → this machine does NOT qualify. Use a real GPU VM with root + Docker (BitLaunch A40 sm_86 via crypto, or a TensorDock KVM VM: real VMs, root, self-serve) — NOT a RunPod/Vast container.\n' "$*" >&2; exit 1; }
 
 echo "== bake sanity (real GPU VM: Docker + Ampere/Ada GPU) =="
 
